@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Native builds - when running builds
+ios/Pods
+ios/build
+android/.gradle
+android/build
+android/app/build
+*.apk
+*.aab
+
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# Misc
+.metro-health-check*
+npm-debug.*
+yarn-error.*
+*.log
+.DS_Store
+
+# WebStorm
+.idea/
