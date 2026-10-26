@@ -8,7 +8,7 @@ import MapView, {Marker, type Region} from 'react-native-maps';
 // Internal Imports
 import {theme} from "@/constants/theme";
 import {View, Platform, Pressable, Text, StyleSheet} from "react-native";
-import {ChallengeLocation, LOCATIONS} from "@/constants/types";
+import {ChallengeLocation} from "@/constants/types";
 import {challengeMapMarkersStyles} from "@/constants/styles";
 import {fetchChallenges} from "@/lib/photos";
 
@@ -20,28 +20,45 @@ const INITIAL_LOCATION: Region = {
     longitudeDelta: 0.15,
 }
 
-
 // MAIN FUNCTION
 export default function ExploreScreen() {
     const {colors} = theme;
     const [selectedLocation, setSelectedLocation] = useState<ChallengeLocation | null>(null);
-    const [locations, setLocations] = useState<ChallengeLocation[]>(LOCATIONS);   // starts with the built-in list, replaced by the database's list once loaded
+    const [locations, setLocations] = useState<ChallengeLocation[]>([]);   // empty list by default. Should pull from Supabase in actuality
 
-    // LOAD CHALLENGE PINS FROM SUPABASE (once, when the map first opens)
+    // Loading useStates:
+    const [isLoading, setIsLoading] = useState(true);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    // Load Challenge Pins from Supabase for Markers
     useEffect(() => {
-        (async () => {
-            try {
-                // STEP 1: Fetch every challenge from the database
-                const challenges = await fetchChallenges();
+        let isMounted = true;
 
-                // STEP 2: Show them on the map (keep the built-in list if the database is empty)
-                if (challenges.length > 0) setLocations(challenges);
-            } catch (err) {
-                // STEP 3: If the request fails (e.g. no internet), keep showing the built-in list
-                console.error("Could not load challenges from Supabase: ", err);
+        async function loadChallenges() {
+            try {
+                // Step 1: loading state initiated
+                setIsLoading(true);
+                setErrorMessage(null);
+
+                // Step 2: get challenges
+                const challenges = await fetchChallenges();
+                // Step 3: set challenges
+                if (isMounted) setLocations(challenges);
             }
-        })();
-    }, []);
+            catch (err) {
+                // Error handling -- display error to inform developers that challengers weren't loaded. Display error for users also
+                console.error("Could not log challenges from Supabase:", err);
+                if (isMounted) setErrorMessage("Could not load challenges. Please try again.");
+            } finally {
+                if (isMounted) setIsLoading(false); // in either case (fail/succeed), state changes to no longer loading.
+            }
+        }
+
+        // Step 4: Load the challenges & unmount
+        loadChallenges().then(res => console.log("Result of loading challenges", res));     // testing purposes; can remove .then() later
+        return () => { isMounted = false; };        // no longer mounted
+
+    })
 
     // Tap Handler: Used for setting new challenge locations
     // TODO: Implement error handling; forbid setting challenges in certain locations potentially? Strech goal.

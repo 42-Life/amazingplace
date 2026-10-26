@@ -8,18 +8,111 @@ import type {ChallengeLocation} from '@/constants/types';
 
 // FETCH CHALLENGES
 // Gets the list of challenges from the database (used when picking which challenge to enter)
+// export async function fetchChallenges(): Promise<ChallengeLocation[]> {
+//     // STEP 1: Ask the database for every challenge, sorted by title
+//     const {data, error} = await supabase
+//         .from('challenges')
+//         .select('id, title, description, latitude, longitude')
+//         .order('title');
+//
+//     // TEMP STEP (1B): Log results of supabase query for developer side
+//     console.log("Supabase error", error);
+//     console.log("Challenges returned:", data);
+//
+//     // STEP 2: Stop here if the request failed
+//     if (error) throw error;
+//
+//     // STEP 3: Return the list (an empty list if there are none yet)
+//     // return (data ?? []) as ChallengeLocation[];
+//     return (data ?? []).map((challenge) => {
+//         const latitude = Number(challenge.latitude);
+//         const longitude = Number(challenge.longitude);
+//
+//         if (
+//             !Number.isFinite(latitude) || !Number.isFinite(longitude)
+//             || latitude < -90 || latitude > 90
+//             || longitude < -180 || longitude > 180
+//         ) {
+//             throw new Error(`Invalid coordinates for challenge: ${challenge.id}`)
+//         }
+//
+//         return {
+//             id: String(challenge.id),
+//             title: challenge.title,
+//             description: challenge.description,
+//             latitude, longitude,
+//         }
+//     })
+//
+// }
+
 export async function fetchChallenges(): Promise<ChallengeLocation[]> {
-    // STEP 1: Ask the database for every challenge, sorted by title
-    const {data, error} = await supabase
-        .from('challenges')
-        .select('id, title, description, latitude, longitude')
-        .order('title');
+    try {
+        // STEP 1: Ask the database for every challenge, sorted by title
+        const {data, error} = await supabase
+            .from('challenges')
+            .select('id, title, description, latitude, longitude')
+            .order('title');
 
-    // STEP 2: Stop here if the request failed
-    if (error) throw error;
+        // STEP 2: Log the query results for debugging
+        console.log("Supabase error:", error);
+        console.log("Challenges returned:", data);
 
-    // STEP 3: Return the list (an empty list if there are none yet)
-    return (data ?? []) as ChallengeLocation[];
+        // STEP 3: Throw an error if the query failed
+        if (error) {
+            throw error;
+        }
+
+        // STEP 4: Validate and convert the returned data
+        const challenges: ChallengeLocation[] = (data ?? []).map((challenge) => {
+            // Reject missing coordinates before converting them to numbers
+            if (
+                challenge.latitude == null ||
+                challenge.longitude == null
+            ) {
+                throw new Error(
+                    `Missing coordinates for challenge: ${challenge.id}`
+                );
+            }
+
+            const latitude = Number(challenge.latitude);
+            const longitude = Number(challenge.longitude);
+
+            // Check that the coordinates are valid
+            if (
+                !Number.isFinite(latitude) ||
+                !Number.isFinite(longitude) ||
+                latitude < -90 ||
+                latitude > 90 ||
+                longitude < -180 ||
+                longitude > 180
+            ) {
+                throw new Error(
+                    `Invalid coordinates for challenge: ${challenge.id}`
+                );
+            }
+
+            return {
+                id: String(challenge.id),
+                title: challenge.title,
+                description: challenge.description,
+                latitude,
+                longitude,
+            };
+        });
+
+        // STEP 5: Return the validated challenges
+        return challenges;
+
+    } catch (err) {
+        // STEP 6: Log the error and pass it to the calling function
+        console.error("Error fetching challenges:", err);
+        throw err;
+
+    } finally {
+        // STEP 7: Runs whether the function succeeds or fails
+        console.log("Finished fetching challenges from Supabase.");
+    }
 }
 
 
