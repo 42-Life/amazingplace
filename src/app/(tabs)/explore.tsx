@@ -1,20 +1,16 @@
-// TEMPORARY IMPLEMENTATION: Will fill with meaningful content & styling once skeleton UI is established
-import ScreenShell from '@/components/ScreenShell';
-
-
-// export default function ExploreScreen() {
-//     return <ScreenShell title="Explore" />;
-// }
+// EXPLORE SCREEN
+// Map of challenge locations. Tap a pin to see the challenge's details.
 
 // KEY IMPORTS
 // React/Expo
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import MapView, {Marker, type Region} from 'react-native-maps';
 // Internal Imports
 import {theme} from "@/constants/theme";
 import {View, Platform, Pressable, Text, StyleSheet} from "react-native";
 import {ChallengeLocation, LOCATIONS} from "@/constants/types";
 import {challengeMapMarkersStyles} from "@/constants/styles";
+import {fetchChallenges} from "@/lib/photos";
 
 // Initial Location: BU College of Arts and Sciences
 const INITIAL_LOCATION: Region = {
@@ -29,6 +25,23 @@ const INITIAL_LOCATION: Region = {
 export default function ExploreScreen() {
     const {colors} = theme;
     const [selectedLocation, setSelectedLocation] = useState<ChallengeLocation | null>(null);
+    const [locations, setLocations] = useState<ChallengeLocation[]>(LOCATIONS);   // starts with the built-in list, replaced by the database's list once loaded
+
+    // LOAD CHALLENGE PINS FROM SUPABASE (once, when the map first opens)
+    useEffect(() => {
+        (async () => {
+            try {
+                // STEP 1: Fetch every challenge from the database
+                const challenges = await fetchChallenges();
+
+                // STEP 2: Show them on the map (keep the built-in list if the database is empty)
+                if (challenges.length > 0) setLocations(challenges);
+            } catch (err) {
+                // STEP 3: If the request fails (e.g. no internet), keep showing the built-in list
+                console.error("Could not load challenges from Supabase: ", err);
+            }
+        })();
+    }, []);
 
     // Tap Handler: Used for setting new challenge locations
     // TODO: Implement error handling; forbid setting challenges in certain locations potentially? Strech goal.
@@ -92,7 +105,7 @@ export default function ExploreScreen() {
                 mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'} // mutedStandard is IOS only; softer colours
                 onPress={() => setSelectedLocation(null)}
             >
-                {SetMarkers(LOCATIONS, selectedLocation)}
+                {SetMarkers(locations, selectedLocation)}
             </MapView>
             {
                 DisplayChallengeInfoCard() // Displays Challenge information conditionally, ie if a location has been selected

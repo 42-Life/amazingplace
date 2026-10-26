@@ -128,4 +128,71 @@ export const photoCaptureStyles = StyleSheet.create({
     textButton: {paddingVertical: 12, paddingHorizontal: 24, borderRadius: 24},
     secondary: {backgroundColor: 'rgba(0,0,0,0.55)'},
     textButtonLabel: {color: '#FFFFFF', fontWeight: '600', fontSize: 16},
+
+    // Sheet that slides up from the bottom to choose which challenge to submit to
+    chooserSheet: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        maxHeight: '60%',
+        padding: 20,
+        paddingBottom: 32,
+        gap: 10,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        backgroundColor: theme.colors.background,
+    },
+    chooserTitle: {fontSize: 18, fontWeight: '700', color: theme.colors.text},
+    chooserItem: {
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: theme.colors.tabBarBorder,
+        marginBottom: 8,
+    },
+    chooserItemTitle: {fontSize: 15, fontWeight: '600', color: theme.colors.text},
+    chooserMessage: {fontSize: 14, color: theme.colors.inactive},
+    chooserCancel: {alignItems: 'center', paddingVertical: 10},
+    chooserCancelText: {fontSize: 15, fontWeight: '600', color: theme.colors.inactive},
+
+    // Dark overlay with a spinner shown while a photo is uploading
+    uploadingOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+    },
 });
+export const galleryStyles = StyleSheet.create({
+    safe: {flex: 1, backgroundColor: colors.background},
+
+    // Title row across the top
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.tabBarBorder,
+    },
+    title: {fontSize: 22, fontWeight: '700', color: colors.text},
+
+    // Spinner / messages sit in the middle of the screen
+    centered: {flex: 1, textAlign: 'center', textAlignVertical: 'center', marginTop: 40},
+    message: {fontSize: 15, color: colors.inactive, paddingHorizontal: 32},
+
+    // Two-column photo grid
+    grid: {padding: 12, gap: 12},
+    row: {gap: 12},
+    tile: {flex: 1, gap: 6},
+    image: {width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: colors.tabBarBorder},
+    caption: {fontSize: 13, fontWeight: '600', color: colors.text},
+})

@@ -31,8 +31,8 @@ export type ChallengeLocation = {
     longitude: number
 }
 
-// TEMP placeholder. Actual locations will be stored in a database implemented via Superbase or Firebase.
-// CRUD operations will be used to then update the database and thereby the challenge markers that show up
+// FALLBACK challenge list. The real list lives in the Supabase "challenges" table and is loaded by the Explore screen.
+// These are only shown if the database can't be reached (e.g. no internet), so the map is never empty.
 export const LOCATIONS: ChallengeLocation[] = [
     {
         id: 'bu-cas-building',
