@@ -2,8 +2,8 @@
 // Everything the app needs to let a signed-in user create a new challenge.
 
 // KEY IMPORTS
-import {supabase} from '@/lib/supabase';
-import type {ChallengeLocation} from '@/constants/types';
+import type { ChallengeLocation } from '@/constants/types';
+import { supabase } from '@/lib/supabase';
 
 
 // FETCH CHALLENGES
@@ -15,11 +15,35 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
         .select('id, title, description, latitude, longitude')
         .order('title');
 
+    // TEMP STEP (1B): Log results of supabase query for developer side
+    console.log("Supabase error", error);
+    console.log("Challenges returned:", data);
+
     // STEP 2: Stop here if the request failed
     if (error) throw error;
 
     // STEP 3: Return the list (an empty list if there are none yet)
-    return (data ?? []) as ChallengeLocation[];
+    // return (data ?? []) as ChallengeLocation[];
+    return (data ?? []).map((challenge) => {
+        const latitude = Number(challenge.latitude);
+        const longitude = Number(challenge.longitude);
+
+        if (
+            !Number.isFinite(latitude) || !Number.isFinite(longitude)
+            || latitude < -90 || latitude > 90
+            || longitude < -180 || longitude > 180
+        ) {
+            throw new Error(`Invalid coordinates for challenge: ${challenge.id}`)
+        }
+
+        return {
+            id: String(challenge.id),
+            title: challenge.title,
+            description: challenge.description,
+            latitude, longitude,
+        }
+    })
+
 }
 
 
