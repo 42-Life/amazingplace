@@ -15,7 +15,8 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {theme} from '@/constants/theme';
 import {photoCaptureStyles} from '@/constants/styles'
 import type {ChallengeLocation} from '@/constants/types';
-import {fetchChallenges, uploadPhotoToChallenge} from '@/lib/photos';
+import {fetchChallenges} from '@/lib/challenges';
+import {uploadPhotoToChallenge} from '@/lib/photos';
 import SubmissionsGallery from '@/components/SubmissionsGallery';
 
 

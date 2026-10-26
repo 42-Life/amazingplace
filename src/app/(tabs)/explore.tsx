@@ -10,7 +10,7 @@ import {theme} from "@/constants/theme";
 import {View, Platform, Pressable, Text, StyleSheet} from "react-native";
 import {ChallengeLocation} from "@/constants/types";
 import {challengeMapMarkersStyles} from "@/constants/styles";
-import {fetchChallenges} from "@/lib/photos";
+import {fetchChallenges} from "@/lib/challenges";
 
 // Initial Location: BU College of Arts and Sciences
 const INITIAL_LOCATION: Region = {

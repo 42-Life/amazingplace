@@ -196,3 +196,149 @@ export const galleryStyles = StyleSheet.create({
     image: {width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: colors.tabBarBorder},
     caption: {fontSize: 13, fontWeight: '600', color: colors.text},
 })
+
+
+export const createChallengeStyles = StyleSheet.create({
+    safe: {
+        flex: 1,
+        backgroundColor: colors.background,
+    },
+
+    // Top bar: title, step counter and progress bar
+    header: {
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: 12,
+        gap: 4,
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: colors.text,
+    },
+    stepLabel: {
+        fontSize: 14,
+        color: colors.inactive,
+    },
+    progressTrack: {
+        flexDirection: 'row',
+        gap: 6,
+        marginTop: 8,
+    },
+    progressSegment: {
+        flex: 1,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: colors.tabBarBorder,
+    },
+    progressSegmentDone: {
+        backgroundColor: colors.active,
+    },
+
+    // Middle section that changes with each step
+    body: {
+        flex: 1,
+    },
+    formContent: {
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        gap: 8,
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.text,
+        marginTop: 8,
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: colors.tabBarBorder,
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        fontSize: 16,
+        color: colors.text,
+    },
+    inputMultiline: {
+        minHeight: 120,
+        textAlignVertical: 'top',
+    },
+    hint: {
+        fontSize: 13,
+        color: colors.inactive,
+    },
+
+    // Step 2: map with a pin locked to the centre
+    mapWrapper: {
+        flex: 1,
+    },
+    pinCentered: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        marginLeft: -20,
+        marginTop: -40,         // lifts the icon so its tip (not its middle) sits on the map's centre
+    },
+    coordinateBadge: {
+        position: 'absolute',
+        bottom: 16,
+        alignSelf: 'center',
+        backgroundColor: colors.background,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: colors.tabBarBorder,
+    },
+    coordinateBadgeText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: colors.text,
+    },
+
+    // Step 3: review
+    reviewValue: {
+        fontSize: 16,
+        color: colors.text,
+    },
+    reviewMap: {
+        height: 180,
+        borderRadius: 12,
+        overflow: 'hidden',
+        marginTop: 4,
+    },
+
+    // Bottom buttons
+    footer: {
+        flexDirection: 'row',
+        gap: 12,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderTopWidth: 1,
+        borderTopColor: colors.tabBarBorder,
+        backgroundColor: colors.background,
+    },
+    button: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+        backgroundColor: colors.active,
+    },
+    buttonSecondary: {
+        backgroundColor: colors.background,
+        borderWidth: 1,
+        borderColor: colors.tabBarBorder,
+    },
+    buttonDisabled: {
+        opacity: 0.4,
+    },
+    buttonText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#FFFFFF',
+    },
+    buttonTextSecondary: {
+        color: colors.text,
+    },
+})
