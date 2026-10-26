@@ -28,6 +28,36 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
 export type NewChallenge = Omit<ChallengeLocation, 'id'>;
 
 
+// GENERATE CHALLENGE ID
+// Turns a title into a readable id (e.g. "BU CAS Photo Challenge" becomes "bu-cas-photo-challenge").
+// If another challenge already has that id, adds -2, -3, and so on until it's unique.
+async function generateChallengeId(title: string): Promise<string> {
+    // STEP 1: Make the title URL-friendly: lowercase letters, numbers and dashes only
+    //   Falls back to "challenge" if the title had no letters or numbers
+    const base = title
+        .toLowerCase()
+        .normalize('NFKD').replace(/[̀-ͯ]/g, '')   // drops accents (é becomes e)
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 60)
+        .replace(/-+$/, '') || 'challenge';
+
+    // STEP 2: Fetch every existing id that starts with this one
+    const {data, error} = await supabase
+        .from('challenges')
+        .select('id')
+        .like('id', `${base}%`);
+    if (error) throw error;
+    const taken = new Set((data ?? []).map((row) => row.id as string));
+
+    // STEP 3: Use the plain id if it's free, otherwise count up until one is
+    if (!taken.has(base)) return base;
+    let suffix = 2;
+    while (taken.has(`${base}-${suffix}`)) suffix++;
+    return `${base}-${suffix}`;
+}
+
+
 // CREATE CHALLENGE
 // Checks the details, saves a new challenge to the database, and returns it (with its new id).
 export async function createChallenge(challenge: NewChallenge): Promise<ChallengeLocation> {
@@ -47,16 +77,21 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     const {data: {session}} = await supabase.auth.getSession();
     if (!session?.user) throw new Error('Not signed in yet. Try closing and reopening the app.');
 
-    // STEP 4: Insert the challenge and ask the database to send the saved row back
+    // STEP 4: Make an id that no other challenge is using
+    const id = await generateChallengeId(title);
+
+    // STEP 5: Insert the challenge and ask the database to send the saved row back
     const {data, error} = await supabase
         .from('challenges')
-        .insert({title, description, latitude, longitude})
+        .insert({id, title, description, latitude, longitude})
         .select('id, title, description, latitude, longitude')
         .single();
 
-    // STEP 5: Stop here if saving failed
+    // STEP 6: Stop here if saving failed
+    //   Code 23505 means the id was taken after our check (someone else created a challenge at the same moment)
+    if (error?.code === '23505') throw new Error('Another challenge was just created with a similar name. Please try again.');
     if (error) throw error;
 
-    // STEP 6: Return the new challenge, so the app can show it right away
+    // STEP 7: Return the new challenge, so the app can show it right away
     return data as ChallengeLocation;
 }
