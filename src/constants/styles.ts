@@ -79,3 +79,53 @@ export const challengeMapMarkersStyles = StyleSheet.create({
     },
     buttonText: {color: '#FFFFFF', fontWeight: '600'},
 })
+
+export const photoCaptureStyles = StyleSheet.create({
+    fill: {flex: 1, backgroundColor: '#000000'},
+    center: {alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16},
+    message: {color: '#FFFFFF', fontSize: 16, textAlign: 'center'},
+
+    // Row of three controls along the bottom, evenly spaced.
+    controls: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 24,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+    },
+
+    // Semi-transparent circle behind small icon buttons so they read on any image.
+    roundButton: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    shutterRing: {
+        width: 76,
+        height: 76,
+        borderRadius: 38,
+        borderWidth: 4,
+        borderColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    shutterCenter: {width: 58, height: 58, borderRadius: 29, backgroundColor: '#FFFFFF'},
+
+    previewButtons: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 24,
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+    },
+    textButton: {paddingVertical: 12, paddingHorizontal: 24, borderRadius: 24},
+    secondary: {backgroundColor: 'rgba(0,0,0,0.55)'},
+    textButtonLabel: {color: '#FFFFFF', fontWeight: '600', fontSize: 16},
+});
