@@ -1,6 +1,7 @@
-// TEMPORARY IMPLEMENTATION: Will fill with meaningful content & styling once skeleton UI is established
-import ScreenShell from '@/components/ScreenShell';
+// CHALLENGES SCREEN
+// Currently just the form for creating a new challenge. The challenge list and leaderboard will go here later.
+import CreateChallengeForm from '@/components/CreateChallengeForm';
 
 export default function ChallengesScreen() {
-    return <ScreenShell title="Challenges" />;
+    return <CreateChallengeForm />;
 }

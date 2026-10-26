@@ -2,8 +2,8 @@
 // Everything the app needs to send a photo to Supabase and enter it into a challenge.
 
 // KEY IMPORTS
-import {supabase} from '@/lib/supabase';
-import type {ChallengeLocation} from '@/constants/types';
+import type { ChallengeLocation } from '@/constants/types';
+import { supabase } from '@/lib/supabase';
 
 
 // FETCH CHALLENGES
