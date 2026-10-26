@@ -21,3 +21,40 @@ export const TABS: TabConfig[] = [
     {name: 'challenges', title: 'Challenges', icon: 'trophy-outline', iconFocused: 'trophy'},   // Challenge List & Leaderboard section
     {name: 'account', title: 'Account', icon: 'person-outline', iconFocused: 'person'},         // Account/Settings section
 ]
+
+//
+export type ChallengeLocation = {
+    id: string
+    title: string
+    description: string
+    latitude: number
+    longitude: number
+}
+
+// TEMP placeholder. Actual locations will be stored in a database implemented via Superbase or Firebase.
+// CRUD operations will be used to then update the database and thereby the challenge markers that show up
+export const LOCATIONS: ChallengeLocation[] = [
+    {
+        id: 'bu-cas-building',
+        title: 'BU College of Arts and Sciences Photo Challenge',
+        description: "The first challenge begins here...",
+        latitude: 42.350294,
+        longitude: -71.105765,
+    },
+
+    {
+        id: 'bu-cds-building',
+        title: 'BU College of Computing and Data Sciences Photo Challenge',
+        description: "Another challenge may be found here",
+        latitude: 42.350188,
+        longitude: -71.103158,
+    },
+
+    {
+        id: 'MIT',
+        title: 'MIT Photo Challenge',
+        description: 'MIT is inviting you to take the best MIT campus photo',
+        latitude: 42.360012,
+        longitude: -71.093995,
+    }
+]

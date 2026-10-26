@@ -14,9 +14,11 @@ export const theme = {
         active: '#FF5A36',
         inactive: '#9AA0A6',
         text: '#111827',
-
         tabBar: '#FFFFFF',
         tabBarBorder: '#E5E7EB',
+
+        // darkModeText: '#E5E7EB'
+        // darkModeBackground: '#2F2F2F',
     },
 
     // Styling for TabBar (bottom menu with key sections)
