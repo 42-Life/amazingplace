@@ -55,10 +55,10 @@ export default function ExploreScreen() {
         }
 
         // Step 4: Load the challenges & unmount
-        loadChallenges().then(res => console.log("Result of loading challenges", res));     // testing purposes; can remove .then() later
+        loadChallenges();
         return () => { isMounted = false; };        // no longer mounted
 
-    })
+    }, [])   // empty array = run once, when the screen first mounts
 
     // Tap Handler: Used for setting new challenge locations
     // TODO: Implement error handling; forbid setting challenges in certain locations potentially? Strech goal.
@@ -83,6 +83,7 @@ export default function ExploreScreen() {
                         }}
                     >
                         <View
+                            accessibilityLabel={location.title}   // without this the map is unusable with a screen reader
                             style={[
                                 challengeMapMarkersStyles.dot,
                                 {backgroundColor: isLocationSelected ? colors.text : colors.active},

@@ -12,8 +12,17 @@ import {createClient} from '@supabase/supabase-js';
 
 // STEP 2: Read the project URL and public key from .env.local
 //   The EXPO_PUBLIC_ prefix is what lets the app read these values
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
+//   Fail with a readable message instead of a crash from inside node_modules,
+//   because .env.local is gitignored and every new contributor hits this first
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+if (!supabaseUrl || !supabasePublishableKey) {
+    throw new Error(
+        'Missing Supabase config. Create a .env.local in the project root with ' +
+        'EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY, then restart the dev server.'
+    );
+}
 
 // STEP 3: Create and export the client
 //   3a. storage: save the session so users stay signed in between launches

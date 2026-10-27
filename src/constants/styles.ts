@@ -16,33 +16,7 @@ export const screenShellStyles = StyleSheet.create({
     },
 })
 
-const {colors, tabBar} = theme;
-
-export const swipeTabsStyles = StyleSheet.create({
-    bar: {
-        flexDirection: 'row',
-        borderTopWidth: 1,
-        backgroundColor: colors.tabBarBorder,
-        borderTopColor: colors.tabBarBorder,
-    },
-
-    tab: {
-        flex: 1,
-        gap: 2,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-
-    tabTitle: {
-        fontSize: tabBar.labelSize,
-        fontWeight: '600',
-    }
-})
-
-export const tabBarAreaStyles = (bottomInset: number) => ({
-    height: tabBar.height,
-    paddingBottom: bottomInset,
-})
+const {colors} = theme;
 
 export const challengeMapMarkersStyles = StyleSheet.create({
     dot: {

@@ -29,7 +29,7 @@ export default function RootLayout() {
     // RENDER: status bar plus the screen stack (no top header, the tabs handle navigation)
     return(
         <>
-            <StatusBar style={"dark"}></StatusBar>
+            <StatusBar style={"auto"}></StatusBar>
             <Stack screenOptions={{headerShown: false}}></Stack>
         </>
     )
