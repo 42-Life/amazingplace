@@ -22,7 +22,7 @@ export const TABS: TabConfig[] = [
     {name: 'account', title: 'Account', icon: 'person-outline', iconFocused: 'person'},         // Account/Settings section
 ]
 
-//
+// One challenge pin: where it is and what people are asked to photograph
 export type ChallengeLocation = {
     id: string
     title: string
@@ -30,33 +30,3 @@ export type ChallengeLocation = {
     latitude: number
     longitude: number
 }
-
-// FALLBACK challenge list. The real list lives in the Supabase "challenges" table and is loaded by the Explore screen.
-// These are only shown if the database can't be reached (e.g. no internet), so the map is never empty.
-
-// fails with the following lines commented out
-// export const LOCATIONS: ChallengeLocation[] = [
-//     {
-//         id: 'bu-cas-building',
-//         title: 'BU College of Arts and Sciences Photo Challenge',
-//         description: "The first challenge begins here...",
-//         latitude: 42.350294,
-//         longitude: -71.105765,
-//     },
-//
-//     {
-//         id: 'bu-cds-building',
-//         title: 'BU College of Computing and Data Sciences Photo Challenge',
-//         description: "Another challenge may be found here",
-//         latitude: 42.350188,
-//         longitude: -71.103158,
-//     },
-//
-//     {
-//         id: 'MIT',
-//         title: 'MIT Photo Challenge',
-//         description: 'MIT is inviting you to take the best MIT campus photo',
-//         latitude: 42.360012,
-//         longitude: -71.093995,
-//     }
-// ]

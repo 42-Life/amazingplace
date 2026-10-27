@@ -203,6 +203,8 @@ export default function CaptureScreen() {
                                         key={challenge.id}
                                         style={photoCaptureStyles.chooserItem}
                                         onPress={() => handleSubmitToChallenge(challenge)}
+                                        accessibilityRole="button"
+                                        accessibilityLabel={`Submit photo to ${challenge.title}`}
                                     >
                                         <Text style={photoCaptureStyles.chooserItemTitle}>{challenge.title}</Text>
                                     </Pressable>

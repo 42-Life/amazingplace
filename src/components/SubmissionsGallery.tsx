@@ -4,9 +4,12 @@
 
 // KEY IMPORTS
 import {useEffect, useState} from 'react';
-import {ActivityIndicator, FlatList, Image, Modal, Pressable, Text, View} from 'react-native';
+import {ActivityIndicator, FlatList, Modal, Pressable, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Ionicons} from '@expo/vector-icons';
+// expo-image, not React Native's Image: this grid loads full-size remote photos,
+// and expo-image gives us disk caching and better memory behaviour for free
+import {Image} from 'expo-image';
 // Internal imports
 import {theme} from '@/constants/theme';
 import {galleryStyles} from '@/constants/styles';
@@ -71,7 +74,12 @@ export default function SubmissionsGallery({visible, onClose}: {visible: boolean
                         renderItem={({item}) => (
                             // 3. Each tile: the photo plus the challenge it was entered into
                             <View style={galleryStyles.tile}>
-                                <Image source={{uri: item.imageUrl}} style={galleryStyles.image} />
+                                <Image
+                                    source={{uri: item.imageUrl}}
+                                    style={galleryStyles.image}
+                                    contentFit="cover"
+                                    accessibilityLabel={`Photo submitted to ${item.challengeTitle}`}
+                                />
                                 <Text style={galleryStyles.caption} numberOfLines={2}>{item.challengeTitle}</Text>
                             </View>
                         )}

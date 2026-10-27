@@ -43,5 +43,5 @@ example
 /android
 
 # extra
-./.idea
+.idea/
 *.log

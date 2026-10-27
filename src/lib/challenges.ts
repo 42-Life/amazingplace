@@ -15,16 +15,20 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
         .select('id, title, description, latitude, longitude')
         .order('title');
 
-    // TEMP STEP (1B): Log results of supabase query for developer side
-    console.log("Supabase error", error);
-    console.log("Challenges returned:", data);
-
     // STEP 2: Stop here if the request failed
     if (error) throw error;
 
     // STEP 3: Return the list (an empty list if there are none yet)
-    // return (data ?? []) as ChallengeLocation[];
-    return (data ?? []).map((challenge) => {
+    //   flatMap, not map: a challenge with broken coordinates is skipped with a warning
+    //   rather than thrown, so one bad row can't empty the whole map
+    return (data ?? []).flatMap((challenge) => {
+        // A missing coordinate has to be caught before Number(), because Number(null) is 0
+        // and that would silently place the challenge off the coast of Africa
+        if (challenge.latitude == null || challenge.longitude == null) {
+            console.warn(`Skipping challenge with missing coordinates: ${challenge.id}`);
+            return [];
+        }
+
         const latitude = Number(challenge.latitude);
         const longitude = Number(challenge.longitude);
 
@@ -33,15 +37,16 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
             || latitude < -90 || latitude > 90
             || longitude < -180 || longitude > 180
         ) {
-            throw new Error(`Invalid coordinates for challenge: ${challenge.id}`)
+            console.warn(`Skipping challenge with invalid coordinates: ${challenge.id}`);
+            return [];
         }
 
-        return {
+        return [{
             id: String(challenge.id),
             title: challenge.title,
             description: challenge.description,
             latitude, longitude,
-        }
+        }]
     })
 
 }
@@ -60,7 +65,7 @@ async function generateChallengeId(title: string): Promise<string> {
     //   Falls back to "challenge" if the title had no letters or numbers
     const base = title
         .toLowerCase()
-        .normalize('NFKD').replace(/[̀-ͯ]/g, '')   // drops accents (é becomes e)
+        .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')   // drops accents (é becomes e)
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '')
         .slice(0, 60)
