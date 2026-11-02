@@ -102,9 +102,9 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) throw new Error('Latitude must be between -90 and 90.');
     if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new Error('Longitude must be between -180 and 180.');
 
-    // STEP 3: Make sure the user is signed in (every phone is signed in anonymously on launch)
+    // STEP 3: Make sure the user is signed in
     const {data: {session}} = await supabase.auth.getSession();
-    if (!session?.user) throw new Error('Not signed in yet. Try closing and reopening the app.');
+    if (!session?.user) throw new Error('Please sign in first.');
 
     // STEP 4: Make an id that no other challenge is using
     const id = await generateChallengeId(title);

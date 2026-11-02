@@ -3,16 +3,17 @@
 
 // KEY IMPORTS
 import { supabase } from '@/lib/supabase';
+import { fetchMyAccount } from '@/lib/accounts';
 
 
 // UPLOAD PHOTO TO A CHALLENGE
 // Takes a photo stored on the phone, uploads it, and records it as a submission.
 // Returns the photo's public web link.
 export async function uploadPhotoToChallenge(localUri: string, challengeId: string, mimeType = 'image/jpeg'): Promise<string> {
-    // STEP 1: Get the signed-in user (every phone is signed in anonymously on launch)
+    // STEP 1: Get the signed-in user (the app only shows its screens to signed-in users)
     const {data: {session}} = await supabase.auth.getSession();
     const user = session?.user;
-    if (!user) throw new Error('Not signed in yet. Try closing and reopening the app.');
+    if (!user) throw new Error('Please sign in first.');
 
     // STEP 2: Build the file's path in storage: <userId>/<challengeId>-<timestamp>.<ext>
     //   Starting with the user's ID is required, since the storage rules only let
@@ -30,7 +31,7 @@ export async function uploadPhotoToChallenge(localUri: string, challengeId: stri
         .upload(filePath, fileBytes, {contentType: mimeType});
     if (uploadError) throw uploadError;
 
-    // STEP 5: Record the submission in the database (user_id is filled in automatically)
+    // STEP 5: Record the submission in the database (account_id is filled in automatically from the signed-in user's account)
     const {error: insertError} = await supabase
         .from('submissions')
         .insert({challenge_id: challengeId, image_path: filePath});
@@ -62,17 +63,16 @@ export type Submission = {
 // FETCH MY SUBMISSIONS
 // Gets every photo the signed-in user has submitted, newest first (used by the gallery)
 export async function fetchMySubmissions(): Promise<Submission[]> {
-    // STEP 1: Get the signed-in user
-    const {data: {session}} = await supabase.auth.getSession();
-    const user = session?.user;
-    if (!user) return [];
+    // STEP 1: Get the signed-in user's account
+    const account = await fetchMyAccount();
+    if (!account) return [];
 
     // STEP 2: Ask the database for this user's submissions,
     //   including each one's challenge title (joined through challenge_id)
     const {data, error} = await supabase
         .from('submissions')
         .select('id, image_path, created_at, challenges(title)')
-        .eq('user_id', user.id)
+        .eq('account_id', account.id)
         .order('created_at', {ascending: false});
 
     // STEP 3: Stop here if the request failed
