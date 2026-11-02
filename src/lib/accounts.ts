@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 export type Account = {
     id: string
     username: string
+    email: string
 }
 
 
@@ -68,5 +69,35 @@ export async function fetchMyAccount(): Promise<Account | null> {
         .eq('auth_user_id', session.user.id)
         .single();
     if (error) throw error;
-    return data as Account;
+    return {...data, email: session.user.email ?? ''} as Account;
+}
+
+
+// UPDATE USERNAME
+// Changes the username on the signed-in user's accounts row
+export async function updateUsername(accountId: string, username: string): Promise<void> {
+    const clean = username.trim();
+    if (clean.length < 3 || clean.length > 20) throw new Error('Username must be 3 to 20 characters.');
+
+    const {error} = await supabase.from('accounts').update({username: clean}).eq('id', accountId);
+    // Code 23505 means another account already has this username
+    if (error?.code === '23505') throw new Error('That username is already taken.');
+    if (error) throw error;
+}
+
+
+// UPDATE EMAIL
+// Changes the login email. If the project requires email confirmation, the change
+// only takes effect after the user clicks the link Supabase sends.
+export async function updateEmail(email: string): Promise<void> {
+    const {error} = await supabase.auth.updateUser({email: email.trim()});
+    if (error) throw error;
+}
+
+
+// UPDATE PASSWORD
+export async function updatePassword(password: string): Promise<void> {
+    if (password.length < 6) throw new Error('Password must be at least 6 characters.');
+    const {error} = await supabase.auth.updateUser({password});
+    if (error) throw error;
 }
