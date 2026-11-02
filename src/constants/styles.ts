@@ -316,3 +316,45 @@ export const createChallengeStyles = StyleSheet.create({
         color: colors.text,
     },
 })
+
+export const authStyles = StyleSheet.create({
+    content: {
+        paddingHorizontal: 20,
+        paddingVertical: 24,
+        gap: 8,
+    },
+    title: {fontSize: 28, fontWeight: '700', color: colors.text},
+    subtitle: {fontSize: 15, color: colors.inactive, marginBottom: 8},
+    label: {fontSize: 14, fontWeight: '600', color: colors.text, marginTop: 8},
+    input: {
+        borderWidth: 1,
+        borderColor: colors.tabBarBorder,
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        fontSize: 16,
+        color: colors.text,
+    },
+    error: {color: '#B91C1C', fontSize: 14, marginTop: 8},
+    notice: {color: colors.text, fontSize: 14, marginTop: 8},
+    button: {
+        marginTop: 16,
+        paddingVertical: 14,
+        borderRadius: 10,
+        alignItems: 'center',
+        backgroundColor: colors.active,
+    },
+    buttonText: {color: '#FFFFFF', fontWeight: '600', fontSize: 16},
+    switchText: {color: colors.active, fontWeight: '600', textAlign: 'center', marginTop: 16},
+    accountName: {fontSize: 24, fontWeight: '700', color: colors.text},
+    accountEmail: {fontSize: 15, color: colors.inactive},
+    secondaryButton: {
+        marginTop: 24,
+        paddingVertical: 14,
+        paddingHorizontal: 32,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.tabBarBorder,
+    },
+    secondaryButtonText: {color: colors.text, fontWeight: '600', fontSize: 16},
+})
