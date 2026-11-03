@@ -8,7 +8,7 @@ import {useCallback, useRef, useState} from 'react';
 import {ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {CameraView, useCameraPermissions, type CameraType} from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import {useFocusEffect} from 'expo-router';
+import {router, useFocusEffect} from 'expo-router';
 import {Ionicons} from '@expo/vector-icons';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 // Internal imports
@@ -72,6 +72,13 @@ export default function CaptureScreen() {
     // SIMPLE HANDLER FUNCTIONS
     const flipCamera = () => {setFacing((current) => (current === 'back' ? 'front' : 'back'))}
 
+    // Closes the camera and goes back to whichever tab the user came from.
+    // Falls back to the map, since there is nothing to go back to if the app opened on this tab.
+    const handleExit = () => {
+        if (router.canGoBack()) router.back();
+        else router.replace('/explore');
+    }
+
     // Clears the current photo and closes any open sheet, returning to the live camera
     const resetPhoto = () => {
         setPhotoUri(null);
@@ -117,6 +124,15 @@ export default function CaptureScreen() {
         } finally {
             setIsLoadingChallenges(false);
         }
+    }
+
+    // KEY HANDLER: NEW CHALLENGE FROM THIS PHOTO
+    // Hands the photo to the create-challenge form, which enters it into the
+    // challenge as its first submission once the challenge is saved
+    const handleNewChallenge = () => {
+        if (!photoUri || isUploading) return;
+        setIsChoosingChallenge(false);
+        router.push({pathname: '/new-challenge', params: {photoUri, photoMimeType}});
     }
 
     // KEY HANDLER: SUBMIT TO CHALLENGE
@@ -192,6 +208,17 @@ export default function CaptureScreen() {
                     <View style={photoCaptureStyles.chooserSheet}>
                         <Text style={photoCaptureStyles.chooserTitle}>Submit to which challenge?</Text>
 
+                        {/* Start a brand new challenge from this photo instead of picking an existing one.
+                            Outside the list below, so it stays put while the list scrolls. */}
+                        <Pressable
+                            style={photoCaptureStyles.chooserItem}
+                            onPress={handleNewChallenge}
+                            accessibilityRole="button"
+                            accessibilityLabel="Create a new challenge from this photo"
+                        >
+                            <Text style={[photoCaptureStyles.chooserItemTitle, {color: colors.active}]}>+ New Challenge</Text>
+                        </Pressable>
+
                         {isLoadingChallenges ? (
                             <ActivityIndicator color={colors.active} />
                         ) : challenges.length === 0 ? (
@@ -235,6 +262,15 @@ export default function CaptureScreen() {
             {isFocused && (
                 <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={facing} />
             )}
+
+            {/* EXIT BUTTON: leaves the camera */}
+            <Pressable
+                style={[photoCaptureStyles.roundButton, {position: 'absolute', top: insets.top + 12, left: 16}]}
+                onPress={handleExit}
+                accessibilityLabel="Close camera"
+            >
+                <Ionicons name="close" size={26} color="#FFFFFF" />
+            </Pressable>
 
             <Pressable
                 style={[photoCaptureStyles.roundButton, {position: 'absolute', top: insets.top + 12, right: 16}]}

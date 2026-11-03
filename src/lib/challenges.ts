@@ -52,6 +52,26 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
 }
 
 
+// FETCH ONE CHALLENGE
+// Gets a single challenge by its id (used by the individual challenge page).
+// Returns null if no challenge has that id, e.g. it was deleted while the app was open.
+export async function fetchChallengeById(id: string): Promise<ChallengeLocation | null> {
+    // STEP 1: Ask the database for the one row with this id
+    //   maybeSingle, not single: a missing row comes back as null instead of an error
+    const {data, error} = await supabase
+        .from('challenges')
+        .select('id, title, description, latitude, longitude')
+        .eq('id', id)
+        .maybeSingle();
+
+    // STEP 2: Stop here if the request failed
+    if (error) throw error;
+
+    // STEP 3: Return the challenge, or null if there is no such id
+    return data as ChallengeLocation | null;
+}
+
+
 // NEW CHALLENGE TYPE
 // What the user fills in when creating a challenge (the database picks the id)
 export type NewChallenge = Omit<ChallengeLocation, 'id'>;
