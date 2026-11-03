@@ -7,10 +7,11 @@
 import {useEffect, useState} from 'react';
 import MapView, {Marker, type LatLng, type LongPressEvent, type Region} from 'react-native-maps';
 import {router} from 'expo-router';
+import {useBottomTabBarHeight} from 'expo-router/tabs';
 import {Ionicons} from '@expo/vector-icons';
 // Internal Imports
 import {theme} from "@/constants/theme";
-import {Alert, ActivityIndicator, KeyboardAvoidingView, View, Platform, Pressable, Text, TextInput, StyleSheet} from "react-native";
+import {Alert, ActivityIndicator, Keyboard, type KeyboardEvent, View, Platform, Pressable, Text, TextInput, StyleSheet} from "react-native";
 import {ChallengeLocation} from "@/constants/types";
 import {challengeMapMarkersStyles} from "@/constants/styles";
 import {createChallenge, fetchChallenges} from "@/lib/challenges";
@@ -41,6 +42,38 @@ export default function ExploreScreen() {
 
     // Both fields need text before the challenge can be saved (same rule as the full form)
     const isDraftValid = draftTitle.trim().length > 0 && draftDescription.trim().length > 0;
+
+    // How tall the on-screen keyboard is (0 when hidden), so the new-challenge popup can sit just above it
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
+    const tabBarHeight = useBottomTabBarHeight();
+
+    // TRACK THE KEYBOARD
+    // Keeps keyboardHeight up to date while the keyboard opens and closes.
+    // iOS only: Android already shrinks the screen to make room for the keyboard.
+    useEffect(function trackKeyboard() {
+        if (Platform.OS !== 'ios') return;
+
+        // STEP 1: Save the keyboard's height as it opens, and reset it to 0 as it closes
+        function handleKeyboardShow(event: KeyboardEvent) {
+            setKeyboardHeight(event.endCoordinates.height);
+        }
+        function handleKeyboardHide() {
+            setKeyboardHeight(0);
+        }
+
+        // STEP 2: Listen for the keyboard opening and closing
+        const showListener = Keyboard.addListener('keyboardWillShow', handleKeyboardShow);
+        const hideListener = Keyboard.addListener('keyboardWillHide', handleKeyboardHide);
+
+        // STEP 3: Stop listening when the screen goes away
+        return function stopTrackingKeyboard() {
+            showListener.remove();
+            hideListener.remove();
+        };
+    }, []);
+
+    // How far to lift the popup: the keyboard covers the tab bar too, so only the part above it counts
+    const popupBottom = Math.max(keyboardHeight - tabBarHeight, 0);
 
     // Load Challenge Pins from Supabase for Markers
     useEffect(() => {
@@ -172,10 +205,8 @@ export default function ExploreScreen() {
         if (!draftCoordinate) return null;
 
         return(
-            <KeyboardAvoidingView
-                style={challengeMapMarkersStyles.draftSheet}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            >
+            // Lifted by popupBottom so the keyboard never covers what the user is typing
+            <View style={[challengeMapMarkersStyles.draftSheet, {bottom: popupBottom}]}>
                 <View style={[challengeMapMarkersStyles.card, {backgroundColor: colors.background}]}>
                     <Text style={[challengeMapMarkersStyles.cardTitle, {color: colors.text}]}>New challenge here</Text>
                     <Text style={[challengeMapMarkersStyles.cardBody, {color: colors.inactive}]}>
@@ -230,7 +261,7 @@ export default function ExploreScreen() {
                         </Pressable>
                     </View>
                 </View>
-            </KeyboardAvoidingView>
+            </View>
         )
     }
 
