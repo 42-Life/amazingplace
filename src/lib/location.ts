@@ -54,8 +54,11 @@ export async function getUserLocation(): Promise<Coordinates | null> {
         // STEP 2: Stop here if they said no
         if (permission.status !== 'granted') return null;
 
-        // STEP 3: Get their current position (Balanced is accurate to about 100 m, which is plenty here)
-        const position = await Location.getCurrentPositionAsync({accuracy: Location.Accuracy.Balanced});
+        // STEP 3: Use the phone's last known position if it has one, since that comes back instantly.
+        //   Only ask for a fresh GPS fix (which can take several seconds) when there isn't one.
+        //   Balanced is accurate to about 100 m, which is plenty here
+        let position = await Location.getLastKnownPositionAsync();
+        if (!position) position = await Location.getCurrentPositionAsync({accuracy: Location.Accuracy.Balanced});
 
         // STEP 4: Return just the latitude and longitude
         return {
