@@ -4,10 +4,10 @@
 
 // KEY IMPORTS
 // Hooks
-import {useEffect, useState} from 'react';
+import {useCallback, useState} from 'react';
 // React and Expo functions and components
 import {FlatList, Pressable, Text, TextInput, View} from 'react-native';
-import {router} from 'expo-router';
+import {router, useFocusEffect} from 'expo-router';
 // Internal imports
 import ScreenShell from '@/components/ScreenShell';
 import {theme} from '@/constants/theme';
@@ -35,9 +35,10 @@ export default function ChallengesScreen() {
     const [hasLocation, setHasLocation] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    // LOAD ON OPEN
-    // Runs once when the screen first appears
-    useEffect(function loadOnOpen() {
+    // LOAD ON FOCUS
+    // Runs every time the user switches to this tab, so newly created challenges show up.
+    //   The spinner only shows on the first load; after that the old list stays up while it refreshes.
+    useFocusEffect(useCallback(function loadOnFocus() {
         // LOAD CHALLENGES
         // Fetches every challenge, works out how far each one is, and sorts them nearest first
         async function loadChallenges() {
@@ -59,9 +60,10 @@ export default function ChallengesScreen() {
                 // STEP 3: Sort nearest first. Without a location they stay A to Z, as fetchChallenges returns them
                 if (location) withDistances.sort(compareByDistance);
 
-                // STEP 4: Show the list
+                // STEP 4: Show the list (and clear any error from an earlier attempt)
                 setChallenges(withDistances);
                 setHasLocation(location !== null);
+                setErrorMessage(null);
             } catch (err) {
                 // Log for developers, show a readable message to users
                 console.error('Could not load challenges:', err);
@@ -72,7 +74,7 @@ export default function ChallengesScreen() {
         }
 
         loadChallenges();
-    }, []);
+    }, []));
 
     // GET VISIBLE CHALLENGES
     // Keeps only the challenges whose title or description contains the search text (ignoring case)
