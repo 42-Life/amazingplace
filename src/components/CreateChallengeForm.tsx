@@ -1,11 +1,13 @@
 // CREATE CHALLENGE FORM
 // Three-step form for making a new challenge: details, then location, then a final review.
+// When opened from the Capture tab it is handed a photo, which becomes the
+// new challenge's first submission (see src/app/new-challenge.tsx).
 
 // KEY IMPORTS
 // Hooks
 import {useState} from 'react';
 // React and Expo functions and components
-import {ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View} from 'react-native';
+import {ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View} from 'react-native';
 import MapView, {type Region} from 'react-native-maps';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Ionicons} from '@expo/vector-icons';
@@ -13,6 +15,7 @@ import {Ionicons} from '@expo/vector-icons';
 import {theme} from '@/constants/theme';
 import {createChallengeStyles as styles} from '@/constants/styles';
 import {createChallenge} from '@/lib/challenges';
+import {uploadPhotoToChallenge} from '@/lib/photos';
 
 // Where the map starts on step 2: BU College of Arts and Sciences
 const START_REGION: Region = {
@@ -26,8 +29,17 @@ const TOTAL_STEPS = 3;
 const STEP_TITLES = ['Details', 'Location', 'Review'];
 
 
+// PROPS
+// All optional, so the Challenges tab can keep rendering <CreateChallengeForm /> as before
+type CreateChallengeFormProps = {
+    photoUri?: string,          // a photo to enter into the challenge once it's created
+    photoMimeType?: string,
+    onCreated?: () => void,     // called after a successful save; the form resets itself if absent
+}
+
+
 // MAIN FUNCTION
-export default function CreateChallengeForm() {
+export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jpeg', onCreated}: CreateChallengeFormProps) {
     const {colors} = theme;
 
     // Form state
@@ -49,14 +61,42 @@ export default function CreateChallengeForm() {
         setCoordinate({latitude: START_REGION.latitude, longitude: START_REGION.longitude});
     }
 
+    // Back to a blank form, unless the caller wants to take over (the photo flow closes the screen)
+    const finish = () => {
+        if (onCreated) onCreated();
+        else resetForm();
+    }
+
     // KEY HANDLER: SUBMIT
     const submit = async () => {
         if (isSubmitting) return;
         setIsSubmitting(true);
         try {
-            await createChallenge({title, description, ...coordinate});
-            Alert.alert('Challenge created', `"${title.trim()}" is now live on the map.`);
-            resetForm();
+            // STEP 1: Save the challenge itself
+            const created = await createChallenge({title, description, ...coordinate});
+
+            // STEP 2: If the user started from a photo, enter it into the challenge they just made
+            //   Wrapped separately: the challenge is already saved at this point, so a failed
+            //   upload must not be reported as a failed creation
+            if (photoUri) {
+                try {
+                    await uploadPhotoToChallenge(photoUri, created.id, photoMimeType);
+                } catch (err) {
+                    console.error("Could not add the photo to the new challenge: ", err);
+                    Alert.alert(
+                        'Challenge created',
+                        `"${created.title}" is now live on the map, but your photo could not be added. You can submit it from the Capture tab.`
+                    );
+                    finish();
+                    return;
+                }
+            }
+
+            // STEP 3: Confirm success
+            Alert.alert('Challenge created', photoUri
+                ? `"${created.title}" is now live on the map, with your photo as its first entry.`
+                : `"${created.title}" is now live on the map.`);
+            finish();
         } catch (err: any) {
             Alert.alert('Could not create challenge', err?.message ?? 'Something went wrong. Please try again.');
         } finally {
@@ -90,6 +130,19 @@ export default function CreateChallengeForm() {
                         maxLength={500}
                     />
                     <Text style={styles.hint}>{description.length}/500</Text>
+
+                    {/* Only in the Capture-tab flow: the photo that will become the first entry */}
+                    {photoUri && (
+                        <>
+                            <Text style={styles.label}>First entry</Text>
+                            <Image
+                                source={{uri: photoUri}}
+                                style={styles.photoPreview}
+                                resizeMode="cover"
+                                accessibilityLabel="The photo that will be entered into this challenge"
+                            />
+                        </>
+                    )}
                 </ScrollView>
             </KeyboardAvoidingView>
         )
