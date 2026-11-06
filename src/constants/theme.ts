@@ -13,6 +13,7 @@ export const theme = {
         inactive: '#6B7280',    // ~4.8:1 on white. The old #9AA0A6 was ~2.6:1, under the 4.5:1 minimum
         text: '#111827',
         tabBarBorder: '#E5E7EB',
+        buttonIconColor: '#FFFFFF',
 
         // darkModeText: '#E5E7EB'
         // darkModeBackground: '#2F2F2F',

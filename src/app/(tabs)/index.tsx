@@ -18,6 +18,9 @@ import type {ChallengeLocation} from '@/constants/types';
 import {fetchChallenges} from '@/lib/challenges';
 import {uploadPhotoToChallenge} from '@/lib/photos';
 import SubmissionsGallery from '@/components/SubmissionsGallery';
+import RoundButton from '@/components/ButtonRound';
+import TextButton from '@/components/ButtonWithText';
+import ButtonWithText from "@/components/ButtonWithText";
 
 
 // MAIN FUNCTION
@@ -171,14 +174,19 @@ export default function CaptureScreen() {
         return(
             <View style={[photoCaptureStyles.fill, photoCaptureStyles.center]}>
                 <Text style={photoCaptureStyles.message}>AmazingPlace requires camera access, so you can capture photos for challenges</Text>
-                <Pressable
-                    style={[photoCaptureStyles.textButton, {backgroundColor: colors.active}]}
-                    onPress={permission.canAskAgain ? requestPermission : Linking.openSettings}     // asks for permission via OS procedure
-                >
-                    <Text style={photoCaptureStyles.textButtonLabel}>
-                        {permission.canAskAgain ? 'Allow camera' : 'Open Settings'}
-                    </Text>
-                </Pressable>
+
+                <ButtonWithText
+                    label={permission.canAskAgain ? 'Allow camera' : 'Open settings'}
+                    onPress={permission.canAskAgain ? requestPermission : Linking.openSettings}
+                />
+                {/*<Pressable*/}
+                {/*    style={[photoCaptureStyles.textButton, {backgroundColor: colors.active}]}*/}
+                {/*    onPress={permission.canAskAgain ? requestPermission : Linking.openSettings}     // asks for permission via OS procedure*/}
+                {/*>*/}
+                {/*    <Text style={photoCaptureStyles.textButtonLabel}>*/}
+                {/*        {permission.canAskAgain ? 'Allow camera' : 'Open Settings'}*/}
+                {/*    </Text>*/}
+                {/*</Pressable>*/}
             </View>
         )
     }
@@ -190,16 +198,16 @@ export default function CaptureScreen() {
                 {/* 1. The photo itself, filling the screen */}
                 <Image source={{uri: photoUri}} style={StyleSheet.absoluteFill} resizeMode="cover" />
 
+                {/* Display discard button when showing preview of taken photo */}
+                {!isChoosingChallenge && !isUploading && (
+                    <RoundButton icon={"close"} label={"Discard photo"} corner={"left"} onPress={resetPhoto} />
+                )}
+
                 {/* 2. Retake / Use Photo buttons (hidden while the sheet is open) */}
                 {!isChoosingChallenge && (
                     <View style={photoCaptureStyles.previewButtons}>
-                        <Pressable style={[photoCaptureStyles.textButton, photoCaptureStyles.secondary]} onPress={resetPhoto} disabled={isUploading}>
-                            <Text style={photoCaptureStyles.textButtonLabel}>Retake Photo</Text>
-                        </Pressable>
-
-                        <Pressable style={[photoCaptureStyles.textButton, {backgroundColor: colors.active}]} onPress={handleUsePhoto} disabled={isUploading}>
-                            <Text style={photoCaptureStyles.textButtonLabel}>Use Photo</Text>
-                        </Pressable>
+                        <TextButton label={"Retake Photo"} variant={"secondary"} onPress={resetPhoto} disabled={isUploading} />
+                        <TextButton label={"Use Photo"} onPress={handleUsePhoto} disabled={isUploading} />
                     </View>
                 )}
 

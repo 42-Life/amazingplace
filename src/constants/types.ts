@@ -1,6 +1,7 @@
 // Necessary import for Icons
 import { Ionicons } from '@expo/vector-icons'
 import type { ComponentProps } from 'react'
+import {type StyleProp, type ViewStyle} from "react-native";
 
 // wrapper for Icon type
 type IconName = ComponentProps<typeof Ionicons>['name']
@@ -30,3 +31,22 @@ export type ChallengeLocation = {
     latitude: number
     longitude: number
 }
+
+// for buttons used in photo screen
+export type PhotoButtonProps = {
+    icon: keyof typeof Ionicons.glyphMap;
+    label: string;                          // accessibility label
+    onPress: () => void;
+    corner?: 'left' | 'right';
+    disabled?: boolean;
+    style?: StyleProp<ViewStyle>;
+};
+
+// for buttons containing text to be used in photo screen
+export type TextButtonProps = {
+    label: string;
+    onPress: () => void;
+    variant?: 'primary' | 'secondary';
+    disabled?: boolean;
+    style?: StyleProp<ViewStyle>;
+};
