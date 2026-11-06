@@ -271,33 +271,14 @@ export default function CaptureScreen() {
                 <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={facing} />
             )}
 
-            {/* EXIT BUTTON: leaves the camera */}
-            <Pressable
-                style={[photoCaptureStyles.roundButton, {position: 'absolute', top: insets.top + 12, left: 16}]}
-                onPress={handleExit}
-                accessibilityLabel="Close camera"
-            >
-                <Ionicons name="close" size={26} color="#FFFFFF" />
-            </Pressable>
-
-            <Pressable
-                style={[photoCaptureStyles.roundButton, {position: 'absolute', top: insets.top + 12, right: 16}]}
-                onPress={flipCamera}
-                accessibilityLabel="Flip camera"
-            >
-                <Ionicons name="camera-reverse-outline" size={26} color="#FFFFFF" />
-            </Pressable>
+            <RoundButton icon="close" label="Close camera" corner="left" onPress={handleExit} />
+            {/*FLIP CAMERA BUTTON: toggles between front/back camera*/}
+            <RoundButton icon="camera-reverse-outline" label="Flip camera" corner="right" onPress={flipCamera} />
 
             <View style={photoCaptureStyles.controls}>
 
                 {/* OPEN PHOTO GALLERY BUTTON*/}
-                <Pressable
-                    style={photoCaptureStyles.roundButton}
-                    onPress={handleViewGallery}
-                    accessibilityLabel="View gallery"
-                >
-                    <Ionicons name="images-outline" size={26} color="#FFFFFF" />
-                </Pressable>
+                <RoundButton icon="images-outline" label="View gallery" onPress={handleViewGallery} />
 
                 {/* CAPTURE PHOTO BUTTON*/}
                 <Pressable
@@ -309,13 +290,7 @@ export default function CaptureScreen() {
                 </Pressable>
 
                 {/* UPLOAD BUTTON*/}
-                <Pressable
-                    style={photoCaptureStyles.roundButton}
-                    onPress={handleUploadFromPhone}
-                    accessibilityLabel="Upload from gallery"
-                >
-                    <Ionicons name="cloud-upload-outline" size={26} color="#FFFFFF" />
-                </Pressable>
+                <RoundButton icon="cloud-upload-outline" label="Upload from gallery" onPress={handleUploadFromPhone} />
             </View>
 
             {/* GALLERY POPUP (hidden until the gallery button is pressed) */}
