@@ -30,7 +30,7 @@ const STEP_TITLES = ['Details', 'Location', 'Review'];
 
 
 // PROPS
-// All optional, so the Challenges tab can keep rendering <CreateChallengeForm /> as before
+// All optional, so the form also works without a photo
 type CreateChallengeFormProps = {
     photoUri?: string,          // a photo to enter into the challenge once it's created
     photoMimeType?: string,

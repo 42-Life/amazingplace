@@ -428,3 +428,47 @@ export const challengeDetailStyles = StyleSheet.create({
     centered: {flex: 1, textAlign: 'center', textAlignVertical: 'center', marginTop: 40},
     message: {fontSize: 15, color: colors.inactive, paddingHorizontal: 32},
 })
+
+
+export const challengeListStyles = StyleSheet.create({
+    // Fills the ScreenShell (which centres its children by default)
+    container: {
+        flex: 1,
+        alignSelf: 'stretch',
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        gap: 12,
+    },
+
+    // "+ New Challenge" button and search box across the top
+    newButton: {
+        paddingVertical: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+        backgroundColor: colors.active,
+    },
+    newButtonText: {color: '#FFFFFF', fontWeight: '600', fontSize: 16},
+    search: {
+        borderWidth: 1,
+        borderColor: colors.tabBarBorder,
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        fontSize: 15,
+        color: colors.text,
+    },
+
+    // One challenge in the list
+    row: {
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.tabBarBorder,
+        gap: 4,
+    },
+    rowTitle: {fontSize: 17, fontWeight: '700', color: colors.text},
+    rowDescription: {fontSize: 14, color: colors.text},
+    rowDistance: {fontSize: 13, fontWeight: '600', color: colors.active},
+
+    // Loading / no location / no results
+    message: {fontSize: 15, color: colors.inactive, textAlign: 'center', marginTop: 8},
+})
