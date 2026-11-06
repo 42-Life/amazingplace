@@ -14,6 +14,7 @@ export const theme = {
         text: '#111827',
         tabBarBorder: '#E5E7EB',
         buttonIconColor: '#FFFFFF',
+        userLocationColor: '#2F80ED'
 
         // darkModeText: '#E5E7EB'
         // darkModeBackground: '#2F2F2F',

@@ -428,3 +428,18 @@ export const challengeDetailStyles = StyleSheet.create({
     centered: {flex: 1, textAlign: 'center', textAlignVertical: 'center', marginTop: 40},
     message: {fontSize: 15, color: colors.inactive, paddingHorizontal: 32},
 })
+
+export const userLocationMarkerStyles = {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.userLocationColor,
+    borderWidth: 3,
+    borderColor: colors.background,
+
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    shadowOffset: {width: 0, height: 1},
+    elevation: 4,
+}
