@@ -1,7 +1,8 @@
 import type {ChallengeLocation} from '@/constants/types';
 import {supabase} from '@/lib/supabase';
+import {getChallengeDate} from '@/utils/challenge-dates';
 
-// All stored challenges are currently treated as active.
+// Only challenges whose end date has not passed are included.
 // Matches part of a title or all stemmed search words in a description, ignoring case.
 // Description words may appear in any order. Blank searches return no results.
 export async function searchChallengesByName(name: string): Promise<ChallengeLocation[]> {
@@ -19,6 +20,7 @@ export async function searchChallengesByName(name: string): Promise<ChallengeLoc
     const {data, error} = await supabase
         .from('challenges')
         .select('id, title, description, latitude, longitude')
+        .gte('end_at', getChallengeDate())
         .or(filters)
         .order('title');
 

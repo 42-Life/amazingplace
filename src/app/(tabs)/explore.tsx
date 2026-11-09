@@ -30,6 +30,7 @@ import {ChallengeLocation} from "@/constants/types";
 import {challengeListStyles as styles, challengeMapMarkersStyles} from "@/constants/styles";
 import {createChallenge, fetchChallenges} from "@/lib/challenges";
 import {searchChallengesByName} from '@/lib/filter';
+import {getChallengeDate} from '@/utils/challenge-dates';
 import ChallengeList from '@/components/ChallengeList';
 
 // CONSTANTS FOR MAP
@@ -53,6 +54,7 @@ export default function ExploreScreen() {
     const [searchDraft, setSearchDraft] = useState('');
     const mapRef = useRef<MapView>(null);
     const defaultChallenges = useRef<ChallengeLocation[] | null>(null);
+    const defaultChallengesDate = useRef<string | null>(null);
     const searchVersion = useRef(0);
     const [lastMapRegion, setLastMapRegion] = useState<Region | null>(null);
 
@@ -181,12 +183,17 @@ export default function ExploreScreen() {
                 setErrorMessage(null);
 
                 // Step 2: get challenges
+                const today = getChallengeDate();
+                if (defaultChallengesDate.current !== today) defaultChallenges.current = null;
                 const challenges = searchQuery
                     ? await searchChallengesByName(searchQuery)
                     : defaultChallenges.current ?? await fetchChallenges();
                 // Step 3: set challenges
                 if (!isMounted || version !== searchVersion.current) return;
-                if (!searchQuery) defaultChallenges.current = challenges;
+                if (!searchQuery) {
+                    defaultChallenges.current = challenges;
+                    defaultChallengesDate.current = today;
+                }
                 setLocations(challenges);
 
                 const firstChallenge = searchQuery ? challenges[0] : null;
@@ -237,9 +244,12 @@ export default function ExploreScreen() {
         setSelectedLocation(null);
         setDraftCoordinate(null);
         setErrorMessage(null);
+        if (defaultChallengesDate.current !== getChallengeDate()) defaultChallenges.current = null;
         if (defaultChallenges.current) {
             setLocations(defaultChallenges.current);
             setIsLoading(false);
+        } else {
+            setIsLoading(true);
         }
         setLastMapRegion(initialRegion);
         if (initialRegion) mapRef.current?.animateToRegion(initialRegion, 400);

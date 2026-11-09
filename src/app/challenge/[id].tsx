@@ -45,7 +45,7 @@ export default function ChallengeScreen() {
 
                 // Step 3: show it, or say so if the id matched nothing
                 if (result) setChallenge(result);
-                else setErrorMessage('That challenge no longer exists.');
+                else setErrorMessage('That challenge has ended or no longer exists.');
             }
             catch (err) {
                 // Error handling -- log for developers, show a readable message to users

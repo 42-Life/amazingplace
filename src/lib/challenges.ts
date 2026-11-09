@@ -4,15 +4,17 @@
 // KEY IMPORTS
 import type { ChallengeLocation } from '@/constants/types';
 import { supabase } from '@/lib/supabase';
+import {getChallengeDate} from '@/utils/challenge-dates';
 
 
 // FETCH CHALLENGES
 // Gets the list of challenges from the database (used when picking which challenge to enter)
 export async function fetchChallenges(): Promise<ChallengeLocation[]> {
-    // STEP 1: Ask the database for every challenge, sorted by title
+    // STEP 1: Get challenges that have not ended, sorted by title.
     const {data, error} = await supabase
         .from('challenges')
         .select('id, title, description, latitude, longitude')
+        .gte('end_at', getChallengeDate())
         .order('title');
 
     // STEP 2: Stop here if the request failed
@@ -62,6 +64,7 @@ export async function fetchChallengeById(id: string): Promise<ChallengeLocation 
         .from('challenges')
         .select('id, title, description, latitude, longitude')
         .eq('id', id)
+        .gte('end_at', getChallengeDate())
         .maybeSingle();
 
     // STEP 2: Stop here if the request failed
@@ -91,7 +94,7 @@ async function generateChallengeId(title: string): Promise<string> {
         .slice(0, 60)
         .replace(/-+$/, '') || 'challenge';
 
-    // STEP 2: Fetch every existing id that starts with this one
+    // STEP 2: Include ended challenges here: their IDs are still taken.
     const {data, error} = await supabase
         .from('challenges')
         .select('id')
