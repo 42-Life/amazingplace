@@ -13,7 +13,7 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
     // STEP 1: Get challenges that have not ended, sorted by title.
     const {data, error} = await supabase
         .from('challenges')
-        .select('id, title, description, latitude, longitude')
+        .select('id, title, description, latitude, longitude, start_at')
         .gte('end_at', getChallengeDate())
         .order('title');
 
@@ -48,6 +48,7 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
             title: challenge.title,
             description: challenge.description,
             latitude, longitude,
+            start_at: challenge.start_at,
         }]
     })
 
@@ -62,7 +63,7 @@ export async function fetchChallengeById(id: string): Promise<ChallengeLocation 
     //   maybeSingle, not single: a missing row comes back as null instead of an error
     const {data, error} = await supabase
         .from('challenges')
-        .select('id, title, description, latitude, longitude')
+        .select('id, title, description, latitude, longitude, start_at')
         .eq('id', id)
         .gte('end_at', getChallengeDate())
         .maybeSingle();
@@ -77,7 +78,7 @@ export async function fetchChallengeById(id: string): Promise<ChallengeLocation 
 
 // NEW CHALLENGE TYPE
 // What the user fills in when creating a challenge (the database picks the id)
-export type NewChallenge = Omit<ChallengeLocation, 'id'>;
+export type NewChallenge = Omit<ChallengeLocation, 'id' | 'start_at'>;
 
 
 // GENERATE CHALLENGE ID
@@ -136,7 +137,7 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     const {data, error} = await supabase
         .from('challenges')
         .insert({id, title, description, latitude, longitude})
-        .select('id, title, description, latitude, longitude')
+        .select('id, title, description, latitude, longitude, start_at')
         .single();
 
     // STEP 6: Stop here if saving failed

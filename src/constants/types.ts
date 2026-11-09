@@ -30,6 +30,7 @@ export type ChallengeLocation = {
     description: string
     latitude: number
     longitude: number
+    start_at: string
 }
 
 // for buttons used in photo screen

@@ -11,9 +11,10 @@ type Props = {
     errorMessage: string | null;
     onRetry: () => void;
     searchQuery: string;
+    hasDateFilter?: boolean;
 };
 
-export default function ChallengeList({challenges, isLoading, errorMessage, onRetry, searchQuery}: Props) {
+export default function ChallengeList({challenges, isLoading, errorMessage, onRetry, searchQuery, hasDateFilter = false}: Props) {
     if (isLoading) {
         return <ActivityIndicator style={styles.centered} color={theme.colors.active} accessibilityLabel="Loading challenges" />;
     }
@@ -39,10 +40,10 @@ export default function ChallengeList({challenges, isLoading, errorMessage, onRe
             keyExtractor={(challenge) => challenge.id}
             ListEmptyComponent={
                 <View style={styles.centered}>
-                    <Text style={styles.title}>{searchQuery.trim() ? 'No matching challenges' : 'No challenges yet'}</Text>
+                    <Text style={styles.title}>{searchQuery.trim() || hasDateFilter ? 'No matching challenges' : 'No challenges yet'}</Text>
                     <Text style={styles.message}>
-                        {searchQuery.trim()
-                            ? 'Try a different search or clear the search bar.'
+                        {searchQuery.trim() || hasDateFilter
+                            ? 'Try a different search or reset your filters.'
                             : 'Switch to Map and hold a spot to create the first challenge.'}
                     </Text>
                 </View>

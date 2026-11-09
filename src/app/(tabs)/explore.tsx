@@ -4,16 +4,23 @@
 
 // KEY IMPORTS
 // React/Expo
-import {useEffect, useRef, useState} from 'react';
-import MapView, {type LatLng, type LongPressEvent, Marker, type Region} from 'react-native-maps';
-import {router} from 'expo-router';
-import {Ionicons} from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import {LocationAccuracy} from 'expo-location';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import { LocationAccuracy } from 'expo-location';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import MapView, { type LatLng, type LongPressEvent, Marker, type Region } from 'react-native-maps';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Internal Imports
-import {theme} from "@/constants/theme";
+import ChallengeList from '@/components/explore/ChallengeList';
+import ChallengeFilterModal from '@/components/explore/ChallengeFilterModal';
+import { challengeMapMarkersStyles, challengeListStyles as styles } from "@/constants/styles";
+import { theme } from "@/constants/theme";
+import { ChallengeLocation } from "@/constants/types";
+import { createChallenge, fetchChallenges } from "@/lib/challenges";
+import { filterChallengesByStartDate, searchChallengesByName, type ChallengeStartDateFilter } from '@/lib/filter';
+import { getChallengeDate } from '@/utils/challenge-dates';
 import {
     ActivityIndicator,
     Alert,
@@ -26,12 +33,6 @@ import {
     TextInput,
     View
 } from "react-native";
-import {ChallengeLocation} from "@/constants/types";
-import {challengeListStyles as styles, challengeMapMarkersStyles} from "@/constants/styles";
-import {createChallenge, fetchChallenges} from "@/lib/challenges";
-import {searchChallengesByName} from '@/lib/filter';
-import {getChallengeDate} from '@/utils/challenge-dates';
-import ChallengeList from '@/components/ChallengeList';
 
 // CONSTANTS FOR MAP
 // Initial Location: BU College of Arts and Sciences
@@ -52,6 +53,10 @@ export default function ExploreScreen() {
     const [reloadCount, setReloadCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchDraft, setSearchDraft] = useState('');
+    const [filtersVisible, setFiltersVisible] = useState(false);
+    const [startDateFilter, setStartDateFilter] = useState<ChallengeStartDateFilter>({from: '', through: ''});
+    const activeStartDateFilter = useRef(startDateFilter);
+    const hasDateFilter = !!(startDateFilter.from || startDateFilter.through);
     const mapRef = useRef<MapView>(null);
     const defaultChallenges = useRef<ChallengeLocation[] | null>(null);
     const defaultChallengesDate = useRef<string | null>(null);
@@ -61,6 +66,7 @@ export default function ExploreScreen() {
     // Location useStates
     const [selectedLocation, setSelectedLocation] = useState<ChallengeLocation | null>(null);
     const [locations, setLocations] = useState<ChallengeLocation[]>([]);   // empty list by default. Should pull from Supabase in actuality
+    const visibleLocations = useMemo(() => filterChallengesByStartDate(locations, startDateFilter), [locations, startDateFilter]);
     const [initialRegion, setInitialRegion] = useState<Region | null>(null);   // null until we know where to start the map
     const [hasLocationPermission, setHasLocationPermission] = useState(false); // controls the blue "you are here" dot
     const [userCoordinate, setUserCoordinate] = useState<LatLng | null>(null);   // live position; null until the first update
@@ -77,6 +83,28 @@ export default function ExploreScreen() {
 
     // Both fields need text before the challenge can be saved (same rule as the full form)
     const isDraftValid = draftTitle.trim().length > 0 && draftDescription.trim().length > 0;
+
+    const focusChallenge = useCallback((challenge: ChallengeLocation | null) => {
+        setSelectedLocation(challenge);
+        if (!challenge) return;
+        const region: Region = {
+            latitude: Number(challenge.latitude),
+            longitude: Number(challenge.longitude),
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+        };
+        setLastMapRegion(region);
+        mapRef.current?.animateToRegion(region, 400);
+    }, []);
+
+    const applyStartDateFilter = (filter: ChallengeStartDateFilter) => {
+        activeStartDateFilter.current = filter;
+        setStartDateFilter(filter);
+        setFiltersVisible(false);
+        setDraftCoordinate(null);
+        const matches = filterChallengesByStartDate(locations, filter);
+        focusChallenge(matches[0] ?? null);
+    };
 
     // useEffect to pick location
     useEffect(() => {
@@ -196,18 +224,8 @@ export default function ExploreScreen() {
                 }
                 setLocations(challenges);
 
-                const firstChallenge = searchQuery ? challenges[0] : null;
-                if (firstChallenge) {
-                    const region: Region = {
-                        latitude: Number(firstChallenge.latitude),
-                        longitude: Number(firstChallenge.longitude),
-                        latitudeDelta: 0.005,
-                        longitudeDelta: 0.005,
-                    };
-                    setSelectedLocation(firstChallenge);
-                    setLastMapRegion(region);
-                    mapRef.current?.animateToRegion(region, 400);
-                }
+                const matches = filterChallengesByStartDate(challenges, activeStartDateFilter.current);
+                if (searchQuery) focusChallenge(matches[0] ?? null);
             }
             catch (err) {
                 // Error handling -- display error to inform developers that challengers weren't loaded. Display error for users also
@@ -222,7 +240,7 @@ export default function ExploreScreen() {
         loadChallenges();
         return () => { isMounted = false; };        // no longer mounted
 
-    }, [reloadCount, searchQuery]);
+    }, [reloadCount, searchQuery, focusChallenge]);
 
     const submitSearch = (text: string) => {
         if (isSaving) return;
@@ -428,7 +446,8 @@ export default function ExploreScreen() {
             <View style={styles.fill}>
                 {viewMode === 'list' && (
                     <ChallengeList
-                        challenges={locations}
+                        challenges={visibleLocations}
+                        hasDateFilter={hasDateFilter}
                         searchQuery={searchQuery}
                         isLoading={isLoading}
                         errorMessage={errorMessage}
@@ -451,7 +470,7 @@ export default function ExploreScreen() {
                             mapPadding={{top: 80, right: 0, bottom: 0, left: 0}}
                         >
                             {/* STEP 1: Show all location markers, orange*/}
-                            {SetMarkers(locations, selectedLocation)}
+                            {SetMarkers(visibleLocations, selectedLocation)}
 
                             {/* Pin dropped where the user long-pressed, until they save or cancel */}
                             {draftCoordinate && (
@@ -497,14 +516,16 @@ export default function ExploreScreen() {
                         </Pressable>
                     )}
                 </View>
-                <View
-                    accessible
-                    accessibilityRole="image"
-                    accessibilityLabel="Filters"
-                    style={[styles.toggleButton, styles.filterButton]}
+                <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={hasDateFilter ? 'Filters, start date filter applied' : 'Filters'}
+                    accessibilityState={{expanded: filtersVisible, disabled: isSaving}}
+                    disabled={isSaving}
+                    onPress={() => {Keyboard.dismiss(); setFiltersVisible(true);}}
+                    style={({pressed}) => [styles.toggleButton, styles.filterButton, hasDateFilter && styles.filterActive, (pressed || isSaving) && styles.pressed]}
                 >
-                    <Ionicons name="options-outline" size={24} color={colors.text} />
-                </View>
+                    <Ionicons name={hasDateFilter ? 'funnel' : 'funnel-outline'} size={24} color={hasDateFilter ? colors.background : colors.text} />
+                </Pressable>
                 <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={viewMode === 'map' ? 'Switch to list view' : 'Switch to map view'}
@@ -523,17 +544,24 @@ export default function ExploreScreen() {
                     <View pointerEvents="box-none" style={styles.clearResultsRow}>
                         <Pressable
                             accessibilityRole="button"
-                            accessibilityLabel="Clear search and show all challenges"
+                            accessibilityLabel={hasDateFilter ? 'Clear search and keep date filters' : 'Clear search and show all challenges'}
                             disabled={isSaving}
                             onPress={clearSearchResults}
                             style={({pressed}) => [styles.clearResultsButton, (pressed || isSaving) && styles.pressed]}
                         >
-                            <Ionicons name="close-outline" size={20} color={colors.text} />
+                            {/* <Ionicons name="close-outline" size={20} color={colors.text} /> */}
                             <Text style={styles.clearResultsText}>Clear search</Text>
                         </Pressable>
                     </View>
                 )}
             </View>
+            {filtersVisible && (
+                <ChallengeFilterModal
+                    filters={startDateFilter}
+                    onApply={applyStartDateFilter}
+                    onClose={() => setFiltersVisible(false)}
+                />
+            )}
         </SafeAreaView>
     )
 }

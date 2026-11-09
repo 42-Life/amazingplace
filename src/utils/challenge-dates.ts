@@ -5,3 +5,9 @@ export function getChallengeDate(date = new Date()): string {
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 }
+
+export function isValidChallengeDate(value: string): boolean {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(`${value}T12:00:00`);
+    return !Number.isNaN(date.getTime()) && getChallengeDate(date) === value;
+}
