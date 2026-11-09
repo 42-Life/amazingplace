@@ -18,6 +18,58 @@ export const screenShellStyles = StyleSheet.create({
 
 const {colors} = theme;
 
+export const challengeListStyles = StyleSheet.create({
+    fill: {flex: 1, backgroundColor: colors.background},
+    searchBar: {
+        position: 'absolute', top: 16, left: 16, right: 136, zIndex: 1,
+        height: 48, borderRadius: 24, paddingLeft: 14, paddingRight: 4,
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        backgroundColor: colors.background,
+        borderWidth: 1, borderColor: colors.tabBarBorder,
+        shadowColor: '#000000', shadowOffset: {width: 0, height: 2},
+        shadowOpacity: 0.15, shadowRadius: 4, elevation: 4,
+    },
+    searchInput: {flex: 1, minWidth: 0, height: '100%', paddingVertical: 0, fontSize: 16, color: colors.text},
+    clearSearch: {width: 40, height: 44, alignItems: 'center', justifyContent: 'center'},
+    toggleButton: {
+        position: 'absolute', top: 16, right: 16, zIndex: 1,
+        width: 48, height: 48, borderRadius: 24,
+        alignItems: 'center', justifyContent: 'center',
+        backgroundColor: colors.background,
+        borderWidth: 1, borderColor: colors.tabBarBorder,
+        shadowColor: '#000000', shadowOffset: {width: 0, height: 2},
+        shadowOpacity: 0.15, shadowRadius: 4, elevation: 4,
+    },
+    filterButton: {right: 76},
+    clearResultsRow: {
+        position: 'absolute', top: 80, left: 16, right: 16, zIndex: 1,
+        alignItems: 'center',
+    },
+    clearResultsButton: {
+        minHeight: 44, paddingHorizontal: 18, borderRadius: 22,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+        backgroundColor: colors.background,
+        borderWidth: 1, borderColor: colors.tabBarBorder,
+        shadowColor: '#000000', shadowOffset: {width: 0, height: 2},
+        shadowOpacity: 0.15, shadowRadius: 4, elevation: 4,
+    },
+    clearResultsText: {fontSize: 15, fontWeight: '600', color: colors.text},
+    content: {flexGrow: 1, padding: 16, paddingTop: 80, gap: 12},
+    searchResultsContent: {paddingTop: 140},
+    centered: {flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12},
+    message: {fontSize: 15, color: colors.inactive, textAlign: 'center'},
+    retry: {minHeight: 44, padding: 12},
+    retryText: {fontSize: 16, fontWeight: '600', color: colors.text},
+    card: {
+        padding: 16, borderWidth: 1, borderColor: colors.tabBarBorder, borderRadius: 16,
+        flexDirection: 'row', alignItems: 'center', gap: 12,
+    },
+    cardBody: {flex: 1, gap: 6},
+    title: {fontSize: 18, fontWeight: '700', color: colors.text},
+    description: {fontSize: 15, lineHeight: 22, color: colors.inactive},
+    pressed: {opacity: 0.6},
+});
+
 export const challengeMapMarkersStyles = StyleSheet.create({
     dot: {
         width: 18,
