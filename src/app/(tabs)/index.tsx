@@ -17,10 +17,10 @@ import {photoCaptureStyles} from '@/constants/styles'
 import type {ChallengeLocation} from '@/constants/types';
 import {fetchChallenges} from '@/lib/challenges';
 import {uploadPhotoToChallenge} from '@/lib/photos';
-import SubmissionsGallery from '@/components/SubmissionsGallery';
-import RoundButton from '@/components/ButtonRound';
-import TextButton from '@/components/ButtonWithText';
-import ButtonWithText from "@/components/ButtonWithText";
+import SubmissionsGallery from '@/components/capture/SubmissionsGallery';
+import RoundButton from '@/components/capture/ButtonRound';
+import TextButton from '@/components/capture/ButtonWithText';
+import ButtonWithText from "@/components/capture/ButtonWithText";
 
 
 // MAIN FUNCTION
@@ -88,7 +88,7 @@ export default function CaptureScreen() {
         setIsChoosingChallenge(false);
     }
 
-    // Opens the gallery of photos this user has submitted (see src/components/SubmissionsGallery.tsx)
+    // Opens the gallery of photos this user has submitted (see src/components/capture/SubmissionsGallery.tsx)
     const handleViewGallery = () => setIsGalleryOpen(true);
 
     // KEY HANDLER: UPLOAD FROM PHONE

@@ -1,21 +1,30 @@
 // EXPLORE SCREEN
-// Map of challenge locations. Tap a pin to see the challenge's details,
+// Map and list of challenge locations. Tap a pin to see the challenge's details,
 // or long-press anywhere to create a new challenge on that spot.
 
 // KEY IMPORTS
 // React/Expo
-import {useEffect, useState} from 'react';
-import MapView, {type LatLng, type LongPressEvent, Marker, type Region} from 'react-native-maps';
-import {router} from 'expo-router';
-import {Ionicons} from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import {LocationAccuracy} from 'expo-location';
+import { LocationAccuracy } from 'expo-location';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import MapView, { type LatLng, type LongPressEvent, Marker, type Region } from 'react-native-maps';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Internal Imports
-import {theme} from "@/constants/theme";
+import ChallengeList from '@/components/explore/ChallengeList';
+import ChallengeFilterModal from '@/components/explore/ChallengeFilterModal';
+import { challengeMapMarkersStyles, challengeListStyles as styles } from "@/constants/styles";
+import { theme } from "@/constants/theme";
+import { ChallengeLocation } from "@/constants/types";
+import { createChallenge, fetchChallenges } from "@/lib/challenges";
+import { filterChallengesByStartDate, searchChallengesByName, type ChallengeStartDateFilter } from '@/lib/filter';
+import { getChallengeDate } from '@/utils/challenge-dates';
 import {
     ActivityIndicator,
     Alert,
+    Keyboard,
     KeyboardAvoidingView,
     Platform,
     Pressable,
@@ -24,9 +33,6 @@ import {
     TextInput,
     View
 } from "react-native";
-import {ChallengeLocation} from "@/constants/types";
-import {challengeMapMarkersStyles, userLocationMarkerStyles} from "@/constants/styles";
-import {createChallenge, fetchChallenges} from "@/lib/challenges";
 
 // CONSTANTS FOR MAP
 // Initial Location: BU College of Arts and Sciences
@@ -43,10 +49,24 @@ const USER_LOCATION_DELTA = 0.05
 // MAIN FUNCTION
 export default function ExploreScreen() {
     const {colors} = theme;
+    const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
+    const [reloadCount, setReloadCount] = useState(0);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchDraft, setSearchDraft] = useState('');
+    const [filtersVisible, setFiltersVisible] = useState(false);
+    const [startDateFilter, setStartDateFilter] = useState<ChallengeStartDateFilter>({from: '', through: ''});
+    const activeStartDateFilter = useRef(startDateFilter);
+    const hasDateFilter = !!(startDateFilter.from || startDateFilter.through);
+    const mapRef = useRef<MapView>(null);
+    const defaultChallenges = useRef<ChallengeLocation[] | null>(null);
+    const defaultChallengesDate = useRef<string | null>(null);
+    const searchVersion = useRef(0);
+    const [lastMapRegion, setLastMapRegion] = useState<Region | null>(null);
 
     // Location useStates
     const [selectedLocation, setSelectedLocation] = useState<ChallengeLocation | null>(null);
     const [locations, setLocations] = useState<ChallengeLocation[]>([]);   // empty list by default. Should pull from Supabase in actuality
+    const visibleLocations = useMemo(() => filterChallengesByStartDate(locations, startDateFilter), [locations, startDateFilter]);
     const [initialRegion, setInitialRegion] = useState<Region | null>(null);   // null until we know where to start the map
     const [hasLocationPermission, setHasLocationPermission] = useState(false); // controls the blue "you are here" dot
     const [userCoordinate, setUserCoordinate] = useState<LatLng | null>(null);   // live position; null until the first update
@@ -63,6 +83,28 @@ export default function ExploreScreen() {
 
     // Both fields need text before the challenge can be saved (same rule as the full form)
     const isDraftValid = draftTitle.trim().length > 0 && draftDescription.trim().length > 0;
+
+    const focusChallenge = useCallback((challenge: ChallengeLocation | null) => {
+        setSelectedLocation(challenge);
+        if (!challenge) return;
+        const region: Region = {
+            latitude: Number(challenge.latitude),
+            longitude: Number(challenge.longitude),
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+        };
+        setLastMapRegion(region);
+        mapRef.current?.animateToRegion(region, 400);
+    }, []);
+
+    const applyStartDateFilter = (filter: ChallengeStartDateFilter) => {
+        activeStartDateFilter.current = filter;
+        setStartDateFilter(filter);
+        setFiltersVisible(false);
+        setDraftCoordinate(null);
+        const matches = filterChallengesByStartDate(locations, filter);
+        focusChallenge(matches[0] ?? null);
+    };
 
     // useEffect to pick location
     useEffect(() => {
@@ -160,6 +202,7 @@ export default function ExploreScreen() {
     // Load Challenge Pins from Supabase for Markers
     useEffect(() => {
         let isMounted = true;
+        const version = searchVersion.current;
 
         async function loadChallenges() {
             try {
@@ -168,16 +211,28 @@ export default function ExploreScreen() {
                 setErrorMessage(null);
 
                 // Step 2: get challenges
-                const challenges = await fetchChallenges();
+                const today = getChallengeDate();
+                if (defaultChallengesDate.current !== today) defaultChallenges.current = null;
+                const challenges = searchQuery
+                    ? await searchChallengesByName(searchQuery)
+                    : defaultChallenges.current ?? await fetchChallenges();
                 // Step 3: set challenges
-                if (isMounted) setLocations(challenges);
+                if (!isMounted || version !== searchVersion.current) return;
+                if (!searchQuery) {
+                    defaultChallenges.current = challenges;
+                    defaultChallengesDate.current = today;
+                }
+                setLocations(challenges);
+
+                const matches = filterChallengesByStartDate(challenges, activeStartDateFilter.current);
+                if (searchQuery) focusChallenge(matches[0] ?? null);
             }
             catch (err) {
                 // Error handling -- display error to inform developers that challengers weren't loaded. Display error for users also
                 console.error("Could not log challenges from Supabase:", err);
-                if (isMounted) setErrorMessage("Could not load challenges. Please try again.");
+                if (isMounted && version === searchVersion.current) setErrorMessage("Could not load challenges. Please try again.");
             } finally {
-                if (isMounted) setIsLoading(false); // in either case (fail/succeed), state changes to no longer loading.
+                if (isMounted && version === searchVersion.current) setIsLoading(false);
             }
         }
 
@@ -185,7 +240,38 @@ export default function ExploreScreen() {
         loadChallenges();
         return () => { isMounted = false; };        // no longer mounted
 
-    }, [])   // empty array = run once, when the screen first mounts
+    }, [reloadCount, searchQuery, focusChallenge]);
+
+    const submitSearch = (text: string) => {
+        if (isSaving) return;
+        searchVersion.current += 1;
+        Keyboard.dismiss();
+        setSearchQuery(text.trim());
+        setReloadCount((count) => count + 1);
+        setIsLoading(true);
+        setSelectedLocation(null);
+        setDraftCoordinate(null);
+    };
+
+    const clearSearchResults = () => {
+        if (isSaving) return;
+        searchVersion.current += 1;
+        Keyboard.dismiss();
+        setSearchDraft('');
+        setSearchQuery('');
+        setSelectedLocation(null);
+        setDraftCoordinate(null);
+        setErrorMessage(null);
+        if (defaultChallengesDate.current !== getChallengeDate()) defaultChallenges.current = null;
+        if (defaultChallenges.current) {
+            setLocations(defaultChallenges.current);
+            setIsLoading(false);
+        } else {
+            setIsLoading(true);
+        }
+        setLastMapRegion(initialRegion);
+        if (initialRegion) mapRef.current?.animateToRegion(initialRegion, 400);
+    };
 
     // Tap Handler: Used for setting new challenge locations
     // TODO: Implement error handling; forbid setting challenges in certain locations potentially? Strech goal.
@@ -221,7 +307,12 @@ export default function ExploreScreen() {
             // STEP 3: Add the pin to the map straight away, so it shows without a reload
             //   Keep the coordinate we pressed: the markers need real numbers, and fetchChallenges
             //   is the only thing that coerces what the database sends back
-            setLocations((current) => [...current, {...created, ...draftCoordinate}]);
+            const newChallenge = {...created, ...draftCoordinate};
+            setLocations((current) => [...current, newChallenge]);
+            if (defaultChallenges.current) {
+                defaultChallenges.current = [...defaultChallenges.current, newChallenge]
+                    .sort((a, b) => a.title.localeCompare(b.title));
+            }
             setDraftCoordinate(null);
             Alert.alert('Challenge created', `"${created.title}" is now live on the map.`);
         } catch (err: any) {
@@ -243,13 +334,14 @@ export default function ExploreScreen() {
                         key={location.id}
                         coordinate={{latitude: location.latitude, longitude: location.longitude}}
                         anchor={{x: 0.5, y:0.5}}
-                        tracksViewChanges={false}
+                        tracksViewChanges
                         onPress={(e) => {
                             e.stopPropagation();
                             handleMarkerPress(location);
                         }}
                     >
                         <View
+                            collapsable={false}
                             accessibilityLabel={location.title}   // without this the map is unusable with a screen reader
                             style={[
                                 challengeMapMarkersStyles.dot,
@@ -349,50 +441,127 @@ export default function ExploreScreen() {
         )
     }
 
-    // Before returning, wait for location permission or location update
-    if (!initialRegion) {
-        return(
-            <View
-                style={{
-                    flex: 1, justifyContent: 'center', alignItems: 'center',
-                    backgroundColor: colors.background,
-                }}
-            >
-                <ActivityIndicator color={colors.active} />
-            </View>
-        )
-    }
-
     return(
-        <View style={{flex:1}}>
-            <MapView
-                style={StyleSheet.absoluteFill} // ensures MapView fills the full area of its parent container
-                initialRegion={initialRegion} // uses region set
-                mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'} // mutedStandard is IOS only; softer colours
-                onPress={() => setSelectedLocation(null)}
-                onLongPress={handleLongPress}
-                // Used to show the location of the user
-                showsUserLocation={hasLocationPermission}
-                showsMyLocationButton={hasLocationPermission}
-            >
-                {/* STEP 1: Show all location markers, orange*/}
-                {SetMarkers(locations, selectedLocation)}
-
-                {/* Pin dropped where the user long-pressed, until they save or cancel */}
-                {draftCoordinate && (
-                    <Marker coordinate={draftCoordinate} anchor={{x: 0.5, y: 1}} tracksViewChanges={false}>
-                        <View accessibilityLabel="New challenge location">
-                            <Ionicons name="location" size={40} color={colors.active} />
-                        </View>
-                    </Marker>
+        <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
+            <View style={styles.fill}>
+                {viewMode === 'list' && (
+                    <ChallengeList
+                        challenges={visibleLocations}
+                        hasDateFilter={hasDateFilter}
+                        searchQuery={searchQuery}
+                        isLoading={isLoading}
+                        errorMessage={errorMessage}
+                        onRetry={() => {setIsLoading(true); setReloadCount((count) => count + 1);}}
+                    />
                 )}
-            </MapView>
-            {
-                DisplayChallengeInfoCard() // Displays Challenge information conditionally, ie if a location has been selected
-            }
-            {
-                DisplayNewChallengeCard()  // Displays the new-challenge popup after a long press
-            }
-        </View>
+                {viewMode === 'map' && <View style={styles.fill}>
+                    {initialRegion ? (
+                        <MapView
+                            ref={mapRef}
+                            style={StyleSheet.absoluteFill} // ensures MapView fills the full area of its parent container
+                            initialRegion={lastMapRegion ?? initialRegion}
+                            onRegionChangeComplete={setLastMapRegion}
+                            mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'} // mutedStandard is IOS only; softer colours
+                            onPress={() => {Keyboard.dismiss(); setSelectedLocation(null);}}
+                            onLongPress={handleLongPress}
+                            // Used to show the location of the user
+                            showsUserLocation={hasLocationPermission}
+                            showsMyLocationButton={hasLocationPermission}
+                            mapPadding={{top: 80, right: 0, bottom: 0, left: 0}}
+                        >
+                            {/* STEP 1: Show all location markers, orange*/}
+                            {SetMarkers(visibleLocations, selectedLocation)}
+
+                            {/* Pin dropped where the user long-pressed, until they save or cancel */}
+                            {draftCoordinate && (
+                                <Marker coordinate={draftCoordinate} anchor={{x: 0.5, y: 1}} tracksViewChanges>
+                                    <View collapsable={false} accessibilityLabel="New challenge location">
+                                        <Ionicons name="location" size={40} color={colors.active} />
+                                    </View>
+                                </Marker>
+                            )}
+                        </MapView>
+                    ) : <ActivityIndicator style={styles.centered} color={colors.active} />}
+                    {
+                        DisplayChallengeInfoCard() // Displays Challenge information conditionally, ie if a location has been selected
+                    }
+                    {
+                        DisplayNewChallengeCard()  // Displays the new-challenge popup after a long press
+                    }
+                </View>}
+                <View style={styles.searchBar}>
+                    <Ionicons name="search-outline" size={22} color={colors.inactive} />
+                    <TextInput
+                        style={styles.searchInput}
+                        accessibilityLabel="Search challenges"
+                        placeholder="Search challenges"
+                        placeholderTextColor={colors.inactive}
+                        value={searchDraft}
+                        onChangeText={setSearchDraft}
+                        editable={!isSaving}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        returnKeyType="search"
+                        onSubmitEditing={(event) => submitSearch(event.nativeEvent.text)}
+                        underlineColorAndroid="transparent"
+                    />
+                    {searchDraft.length > 0 && (
+                        <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel="Clear search"
+                            onPress={() => setSearchDraft('')}
+                            style={styles.clearSearch}
+                        >
+                            <Ionicons name="close-circle" size={20} color={colors.inactive} />
+                        </Pressable>
+                    )}
+                </View>
+                <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={hasDateFilter ? 'Filters, start date filter applied' : 'Filters'}
+                    accessibilityState={{expanded: filtersVisible, disabled: isSaving}}
+                    disabled={isSaving}
+                    onPress={() => {Keyboard.dismiss(); setFiltersVisible(true);}}
+                    style={({pressed}) => [styles.toggleButton, styles.filterButton, hasDateFilter && styles.filterActive, (pressed || isSaving) && styles.pressed]}
+                >
+                    <Ionicons name={hasDateFilter ? 'funnel' : 'funnel-outline'} size={24} color={hasDateFilter ? colors.background : colors.text} />
+                </Pressable>
+                <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={viewMode === 'map' ? 'Switch to list view' : 'Switch to map view'}
+                    accessibilityState={{disabled: isSaving}}
+                    disabled={isSaving}
+                    onPress={() => {Keyboard.dismiss(); setViewMode((current) => current === 'map' ? 'list' : 'map');}}
+                    style={({pressed}) => [styles.toggleButton, (pressed || isSaving) && styles.pressed]}
+                >
+                    <Ionicons
+                        name={viewMode === 'map' ? 'list-outline' : 'map-outline'}
+                        size={24}
+                        color={colors.text}
+                    />
+                </Pressable>
+                {searchQuery.length > 0 && (
+                    <View pointerEvents="box-none" style={styles.clearResultsRow}>
+                        <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={hasDateFilter ? 'Clear search and keep date filters' : 'Clear search and show all challenges'}
+                            disabled={isSaving}
+                            onPress={clearSearchResults}
+                            style={({pressed}) => [styles.clearResultsButton, (pressed || isSaving) && styles.pressed]}
+                        >
+                            {/* <Ionicons name="close-outline" size={20} color={colors.text} /> */}
+                            <Text style={styles.clearResultsText}>Clear search</Text>
+                        </Pressable>
+                    </View>
+                )}
+            </View>
+            {filtersVisible && (
+                <ChallengeFilterModal
+                    filters={startDateFilter}
+                    onApply={applyStartDateFilter}
+                    onClose={() => setFiltersVisible(false)}
+                />
+            )}
+        </SafeAreaView>
     )
 }

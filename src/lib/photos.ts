@@ -4,6 +4,7 @@
 // KEY IMPORTS
 import { supabase } from '@/lib/supabase';
 import { fetchMyAccount } from '@/lib/accounts';
+import {getChallengeDate} from '@/utils/challenge-dates';
 
 
 // UPLOAD PHOTO TO A CHALLENGE
@@ -71,7 +72,8 @@ export async function fetchMySubmissions(): Promise<Submission[]> {
     //   including each one's challenge title (joined through challenge_id)
     const {data, error} = await supabase
         .from('submissions')
-        .select('id, image_path, created_at, challenges(title)')
+        .select('id, image_path, created_at, challenges!inner(title)')
+        .gte('challenges.end_at', getChallengeDate())
         .eq('account_id', account.id)
         .order('created_at', {ascending: false});
 
