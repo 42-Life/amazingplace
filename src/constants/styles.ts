@@ -56,7 +56,6 @@ export const challengeListStyles = StyleSheet.create({
     },
     clearResultsText: {fontSize: 15, fontWeight: '600', color: colors.text},
     content: {flexGrow: 1, padding: 16, paddingTop: 80, gap: 12},
-    searchResultsContent: {paddingTop: 140},
     centered: {flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12},
     message: {fontSize: 15, color: colors.inactive, textAlign: 'center'},
     retry: {minHeight: 44, padding: 12},
@@ -354,14 +353,6 @@ export const createChallengeStyles = StyleSheet.create({
         color: colors.inactive,
     },
 
-    // Thumbnail of the photo the challenge was started from (only in the Capture-tab flow)
-    photoPreview: {
-        width: '100%',
-        height: 160,
-        borderRadius: 12,
-        backgroundColor: colors.tabBarBorder,
-        marginTop: 4,
-    },
 
     // Step 2: map with a pin locked to the centre
     mapWrapper: {
@@ -389,6 +380,11 @@ export const createChallengeStyles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
         color: colors.text,
+    },
+    radiusPanel: {
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        gap: 8,
     },
 
     // Step 3: review

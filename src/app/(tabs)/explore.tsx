@@ -10,7 +10,7 @@ import { LocationAccuracy } from 'expo-location';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MapView, { type LatLng, type LongPressEvent, Marker, type Region } from 'react-native-maps';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Internal Imports
 import ChallengeList from '@/components/explore/ChallengeList';
@@ -49,6 +49,7 @@ const USER_LOCATION_DELTA = 0.05
 // MAIN FUNCTION
 export default function ExploreScreen() {
     const {colors} = theme;
+    const insets = useSafeAreaInsets();   // status bar height; floating controls sit below it while the map runs behind it
     const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
     const [reloadCount, setReloadCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
@@ -442,7 +443,7 @@ export default function ExploreScreen() {
     }
 
     return(
-        <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={styles.fill} edges={['left', 'right']}>
             <View style={styles.fill}>
                 {viewMode === 'list' && (
                     <ChallengeList
@@ -467,7 +468,7 @@ export default function ExploreScreen() {
                             // Used to show the location of the user
                             showsUserLocation={hasLocationPermission}
                             showsMyLocationButton={hasLocationPermission}
-                            mapPadding={{top: 80, right: 0, bottom: 0, left: 0}}
+                            mapPadding={{top: insets.top + 80, right: 0, bottom: 0, left: 0}}
                         >
                             {/* STEP 1: Show all location markers, orange*/}
                             {SetMarkers(visibleLocations, selectedLocation)}
@@ -489,7 +490,7 @@ export default function ExploreScreen() {
                         DisplayNewChallengeCard()  // Displays the new-challenge popup after a long press
                     }
                 </View>}
-                <View style={styles.searchBar}>
+                <View style={[styles.searchBar, {top: insets.top + 16}]}>
                     <Ionicons name="search-outline" size={22} color={colors.inactive} />
                     <TextInput
                         style={styles.searchInput}
@@ -522,7 +523,7 @@ export default function ExploreScreen() {
                     accessibilityState={{expanded: filtersVisible, disabled: isSaving}}
                     disabled={isSaving}
                     onPress={() => {Keyboard.dismiss(); setFiltersVisible(true);}}
-                    style={({pressed}) => [styles.toggleButton, styles.filterButton, hasDateFilter && styles.filterActive, (pressed || isSaving) && styles.pressed]}
+                    style={({pressed}) => [styles.toggleButton, {top: insets.top + 16}, styles.filterButton, hasDateFilter && styles.filterActive, (pressed || isSaving) && styles.pressed]}
                 >
                     <Ionicons name={hasDateFilter ? 'funnel' : 'funnel-outline'} size={24} color={hasDateFilter ? colors.background : colors.text} />
                 </Pressable>
@@ -532,7 +533,7 @@ export default function ExploreScreen() {
                     accessibilityState={{disabled: isSaving}}
                     disabled={isSaving}
                     onPress={() => {Keyboard.dismiss(); setViewMode((current) => current === 'map' ? 'list' : 'map');}}
-                    style={({pressed}) => [styles.toggleButton, (pressed || isSaving) && styles.pressed]}
+                    style={({pressed}) => [styles.toggleButton, {top: insets.top + 16}, (pressed || isSaving) && styles.pressed]}
                 >
                     <Ionicons
                         name={viewMode === 'map' ? 'list-outline' : 'map-outline'}
@@ -541,7 +542,7 @@ export default function ExploreScreen() {
                     />
                 </Pressable>
                 {searchQuery.length > 0 && (
-                    <View pointerEvents="box-none" style={styles.clearResultsRow}>
+                    <View pointerEvents="box-none" style={[styles.clearResultsRow, {top: insets.top + 80}]}>
                         <Pressable
                             accessibilityRole="button"
                             accessibilityLabel={hasDateFilter ? 'Clear search and keep date filters' : 'Clear search and show all challenges'}

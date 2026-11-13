@@ -13,7 +13,7 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
     // STEP 1: Get challenges that have not ended, sorted by title.
     const {data, error} = await supabase
         .from('challenges')
-        .select('id, title, description, latitude, longitude, start_at')
+        .select('id, title, description, latitude, longitude, start_at, radius_m')
         .gte('end_at', getChallengeDate())
         .order('title');
 
@@ -49,6 +49,7 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
             description: challenge.description,
             latitude, longitude,
             start_at: challenge.start_at,
+            radius_m: Number(challenge.radius_m),
         }]
     })
 
@@ -63,7 +64,7 @@ export async function fetchChallengeById(id: string): Promise<ChallengeLocation 
     //   maybeSingle, not single: a missing row comes back as null instead of an error
     const {data, error} = await supabase
         .from('challenges')
-        .select('id, title, description, latitude, longitude, start_at')
+        .select('id, title, description, latitude, longitude, start_at, radius_m')
         .eq('id', id)
         .gte('end_at', getChallengeDate())
         .maybeSingle();
@@ -77,8 +78,9 @@ export async function fetchChallengeById(id: string): Promise<ChallengeLocation 
 
 
 // NEW CHALLENGE TYPE
-// What the user fills in when creating a challenge (the database picks the id)
-export type NewChallenge = Omit<ChallengeLocation, 'id' | 'start_at'>;
+// What the user fills in when creating a challenge (the app picks the id).
+// radius_m is optional: leave it out and the database uses its default (100 m).
+export type NewChallenge = Omit<ChallengeLocation, 'id' | 'start_at' | 'radius_m'> & {radius_m?: number};
 
 
 // GENERATE CHALLENGE ID
@@ -125,6 +127,8 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     const {latitude, longitude} = challenge;
     if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) throw new Error('Latitude must be between -90 and 90.');
     if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new Error('Longitude must be between -180 and 180.');
+    const {radius_m} = challenge;
+    if (radius_m !== undefined && (!Number.isFinite(radius_m) || radius_m <= 0)) throw new Error('Radius must be more than 0 meters.');
 
     // STEP 3: Make sure the user is signed in
     const {data: {session}} = await supabase.auth.getSession();
@@ -136,8 +140,8 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     // STEP 5: Insert the challenge and ask the database to send the saved row back
     const {data, error} = await supabase
         .from('challenges')
-        .insert({id, title, description, latitude, longitude})
-        .select('id, title, description, latitude, longitude, start_at')
+        .insert({id, title, description, latitude, longitude, ...(radius_m !== undefined && {radius_m})})
+        .select('id, title, description, latitude, longitude, start_at, radius_m')
         .single();
 
     // STEP 6: Stop here if saving failed

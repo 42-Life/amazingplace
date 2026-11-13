@@ -1,5 +1,6 @@
 // CHALLENGE SCREEN
 // One challenge's title and description. Opened by the "View challenge" button on the map.
+// This is the only place the camera lives: photos taken here go to this challenge only.
 
 // KEY IMPORTS
 // Hooks
@@ -14,6 +15,7 @@ import {theme} from '@/constants/theme';
 import {challengeDetailStyles as styles} from '@/constants/styles';
 import type {ChallengeLocation} from '@/constants/types';
 import {fetchChallengeById} from '@/lib/challenges';
+import ChallengeCamera from '@/components/capture/ChallengeCamera';
 
 
 // MAIN FUNCTION
@@ -28,6 +30,7 @@ export default function ChallengeScreen() {
     // Loading useStates:
     const [isLoading, setIsLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [isCameraOpen, setIsCameraOpen] = useState(false);     // true while the camera covers the page
 
     // LOAD THIS CHALLENGE FROM SUPABASE
     useEffect(() => {
@@ -62,6 +65,11 @@ export default function ChallengeScreen() {
 
     }, [id])   // re-runs if the user opens a different challenge
 
+    // CAMERA: takes over the whole screen, locked to this challenge
+    if (isCameraOpen && challenge) {
+        return <ChallengeCamera challenge={challenge} onClose={() => setIsCameraOpen(false)} />
+    }
+
     return(
         <SafeAreaView style={styles.safe} edges={['top']}>
             {/* 1. Header: back to the map */}
@@ -80,6 +88,12 @@ export default function ChallengeScreen() {
                 <View style={styles.body}>
                     <Text style={styles.title}>{challenge.title}</Text>
                     <Text style={styles.description}>{challenge.description}</Text>
+                    <Text style={styles.description}>Photos must be taken within {Math.round(challenge.radius_m)} m of this spot.</Text>
+
+                    {/* Opens the camera; any photo taken goes to this challenge */}
+                    <Pressable onPress={() => setIsCameraOpen(true)} accessibilityRole="button">
+                        <Text style={{color: colors.active, fontSize: 16, fontWeight: '600'}}>Take a photo</Text>
+                    </Pressable>
                 </View>
             )}
         </SafeAreaView>

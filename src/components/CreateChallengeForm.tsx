@@ -1,21 +1,19 @@
 // CREATE CHALLENGE FORM
-// Three-step form for making a new challenge: details, then location, then a final review.
-// When opened from the Capture tab it is handed a photo, which becomes the
-// new challenge's first submission (see src/app/new-challenge.tsx).
+// Three-step form for making a new challenge: details, then location (and radius), then a final review.
 
 // KEY IMPORTS
 // Hooks
 import {useState} from 'react';
 // React and Expo functions and components
-import {ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View} from 'react-native';
-import MapView, {type Region} from 'react-native-maps';
+import {ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View} from 'react-native';
+import MapView, {Circle, type Region} from 'react-native-maps';
+import {Slider} from '@expo/ui/community/slider';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Ionicons} from '@expo/vector-icons';
 // Internal imports
 import {theme} from '@/constants/theme';
 import {createChallengeStyles as styles} from '@/constants/styles';
 import {createChallenge} from '@/lib/challenges';
-import {uploadPhotoToChallenge} from '@/lib/photos';
 
 // Where the map starts on step 2: BU College of Arts and Sciences
 const START_REGION: Region = {
@@ -25,21 +23,28 @@ const START_REGION: Region = {
     longitudeDelta: 0.01,
 }
 
+// Radius slider: how far from the pin photos may be taken, in meters
+const MIN_RADIUS_M = 25;
+const MAX_RADIUS_M = 1000;
+const RADIUS_STEP_M = 25;
+const DEFAULT_RADIUS_M = 100;
+
+// Shown as "250 m" or "1 km"
+const formatRadius = (meters: number) => meters >= 1000 ? `${meters / 1000} km` : `${meters} m`;
+
 const TOTAL_STEPS = 3;
 const STEP_TITLES = ['Details', 'Location', 'Review'];
 
 
 // PROPS
-// All optional, so the Challenges tab can keep rendering <CreateChallengeForm /> as before
+// Optional, so the Challenges tab can keep rendering <CreateChallengeForm /> as before
 type CreateChallengeFormProps = {
-    photoUri?: string,          // a photo to enter into the challenge once it's created
-    photoMimeType?: string,
     onCreated?: () => void,     // called after a successful save; the form resets itself if absent
 }
 
 
 // MAIN FUNCTION
-export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jpeg', onCreated}: CreateChallengeFormProps) {
+export default function CreateChallengeForm({onCreated}: CreateChallengeFormProps) {
     const {colors} = theme;
 
     // Form state
@@ -47,6 +52,7 @@ export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jp
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [coordinate, setCoordinate] = useState({latitude: START_REGION.latitude, longitude: START_REGION.longitude});   // the spot under the pin
+    const [radiusM, setRadiusM] = useState(DEFAULT_RADIUS_M);        // photos must be taken within this many meters of the pin
     const [isSubmitting, setIsSubmitting] = useState(false);         // true while saving; blocks double submits
 
     // Step 1 is only done once both fields have text
@@ -59,9 +65,10 @@ export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jp
         setTitle('');
         setDescription('');
         setCoordinate({latitude: START_REGION.latitude, longitude: START_REGION.longitude});
+        setRadiusM(DEFAULT_RADIUS_M);
     }
 
-    // Back to a blank form, unless the caller wants to take over (the photo flow closes the screen)
+    // Back to a blank form, unless the caller wants to take over
     const finish = () => {
         if (onCreated) onCreated();
         else resetForm();
@@ -72,30 +79,11 @@ export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jp
         if (isSubmitting) return;
         setIsSubmitting(true);
         try {
-            // STEP 1: Save the challenge itself
-            const created = await createChallenge({title, description, ...coordinate});
+            // STEP 1: Save the challenge
+            const created = await createChallenge({title, description, ...coordinate, radius_m: radiusM});
 
-            // STEP 2: If the user started from a photo, enter it into the challenge they just made
-            //   Wrapped separately: the challenge is already saved at this point, so a failed
-            //   upload must not be reported as a failed creation
-            if (photoUri) {
-                try {
-                    await uploadPhotoToChallenge(photoUri, created.id, photoMimeType);
-                } catch (err) {
-                    console.error("Could not add the photo to the new challenge: ", err);
-                    Alert.alert(
-                        'Challenge created',
-                        `"${created.title}" is now live on the map, but your photo could not be added. You can submit it from the Capture tab.`
-                    );
-                    finish();
-                    return;
-                }
-            }
-
-            // STEP 3: Confirm success
-            Alert.alert('Challenge created', photoUri
-                ? `"${created.title}" is now live on the map, with your photo as its first entry.`
-                : `"${created.title}" is now live on the map.`);
+            // STEP 2: Confirm success
+            Alert.alert('Challenge created', `"${created.title}" is now live on the map.`);
             finish();
         } catch (err: any) {
             Alert.alert('Could not create challenge', err?.message ?? 'Something went wrong. Please try again.');
@@ -130,36 +118,27 @@ export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jp
                         maxLength={500}
                     />
                     <Text style={styles.hint}>{description.length}/500</Text>
-
-                    {/* Only in the Capture-tab flow: the photo that will become the first entry */}
-                    {photoUri && (
-                        <>
-                            <Text style={styles.label}>First entry</Text>
-                            <Image
-                                source={{uri: photoUri}}
-                                style={styles.photoPreview}
-                                resizeMode="cover"
-                                accessibilityLabel="The photo that will be entered into this challenge"
-                            />
-                        </>
-                    )}
                 </ScrollView>
             </KeyboardAvoidingView>
         )
     }
 
-    // STEP 2: PICK LOCATION
+    // STEP 2: PICK LOCATION AND RADIUS
     //   The pin never moves on screen. The user drags the map under it,
     //   and whatever is at the centre when they let go is the location.
+    //   The slider below sets how far from the pin photos may be taken (drawn as a circle).
     function LocationStep() {
         return(
+            <View style={styles.body}>
             <View style={styles.mapWrapper}>
                 <MapView
                     style={{flex: 1}}
                     initialRegion={{...START_REGION, ...coordinate}}   // reopens where the user left off if they came back from step 3
                     mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
                     onRegionChangeComplete={(region) => setCoordinate({latitude: region.latitude, longitude: region.longitude})}
-                />
+                >
+                    <Circle center={coordinate} radius={radiusM} strokeColor={colors.active} fillColor="rgba(255, 90, 54, 0.15)" />
+                </MapView>
                 <View style={styles.pinCentered} pointerEvents="none">
                     <Ionicons name="location" size={40} color={colors.active} />
                 </View>
@@ -168,6 +147,22 @@ export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jp
                         {coordinate.latitude.toFixed(6)}, {coordinate.longitude.toFixed(6)}
                     </Text>
                 </View>
+            </View>
+
+            {/* Radius slider */}
+            <View style={styles.radiusPanel}>
+                <Text style={styles.label}>Photo radius: {formatRadius(radiusM)}</Text>
+                <Slider
+                    value={radiusM}
+                    minimumValue={MIN_RADIUS_M}
+                    maximumValue={MAX_RADIUS_M}
+                    step={RADIUS_STEP_M}
+                    onValueChange={(value) => setRadiusM(Math.round(value / RADIUS_STEP_M) * RADIUS_STEP_M)}
+                    minimumTrackTintColor={colors.active}
+                    accessibilityLabel="Photo radius"
+                />
+                <Text style={styles.hint}>Photos must be taken within this distance of the pin.</Text>
+            </View>
             </View>
         )
     }
@@ -188,6 +183,9 @@ export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jp
                 <Text style={styles.label}>Longitude</Text>
                 <Text style={styles.reviewValue}>{coordinate.longitude.toFixed(6)}</Text>
 
+                <Text style={styles.label}>Photo radius</Text>
+                <Text style={styles.reviewValue}>{formatRadius(radiusM)}</Text>
+
                 <Text style={styles.label}>Location</Text>
                 <View style={styles.reviewMap}>
                     <MapView
@@ -198,7 +196,9 @@ export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jp
                         zoomEnabled={false}
                         rotateEnabled={false}
                         pitchEnabled={false}
-                    />
+                    >
+                        <Circle center={coordinate} radius={radiusM} strokeColor={colors.active} fillColor="rgba(255, 90, 54, 0.15)" />
+                    </MapView>
                     <View style={styles.pinCentered} pointerEvents="none">
                         <Ionicons name="location" size={40} color={colors.active} />
                     </View>

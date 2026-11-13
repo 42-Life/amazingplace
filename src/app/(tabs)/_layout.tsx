@@ -36,6 +36,8 @@ export default function TabsLayout() {
                     }}
                 />
             ))}
+            {/* index only redirects to explore; keep it out of the tab bar */}
+            <Tabs.Screen name="index" options={{href: null}} />
         </Tabs>
     )
 }
