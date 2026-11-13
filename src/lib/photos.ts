@@ -39,7 +39,6 @@ export async function uploadPhotoToChallenge(
     localUri: string,
     challenge: ChallengeLocation,
     location: PhotoLocation | null,
-    mimeType = 'image/jpeg',
 ): Promise<string> {
     const challengeId = challenge.id;
 
@@ -51,11 +50,10 @@ export async function uploadPhotoToChallenge(
     const user = session?.user;
     if (!user) throw new Error('Please sign in first.');
 
-    // STEP 2: Build the file's path in storage: <userId>/<challengeId>-<timestamp>.<ext>
+    // STEP 2: Build the file's path in storage: <userId>/<challengeId>-<timestamp>.jpg
     //   Starting with the user's ID is required, since the storage rules only let
     //   users upload into their own folder
-    const extension = mimeType.split('/')[1] ?? 'jpg';
-    const filePath = `${user.id}/${challengeId}-${Date.now()}.${extension}`;
+    const filePath = `${user.id}/${challengeId}-${Date.now()}.jpg`;
 
     // STEP 3: Read the photo off the phone as raw bytes
     //   React Native can't upload a file object directly, so we send the bytes instead
@@ -64,7 +62,7 @@ export async function uploadPhotoToChallenge(
     // STEP 4: Upload the bytes to the "photos" storage bucket
     const {error: uploadError} = await supabase.storage
         .from('photos')
-        .upload(filePath, fileBytes, {contentType: mimeType});
+        .upload(filePath, fileBytes, {contentType: 'image/jpeg'});   // the camera always saves JPEG
     if (uploadError) throw uploadError;
 
     // STEP 5: Record the submission in the database (account_id is filled in automatically from the signed-in user's account)

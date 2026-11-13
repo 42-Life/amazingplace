@@ -15,17 +15,17 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 // Internal Imports
 import ChallengeList from '@/components/explore/ChallengeList';
 import ChallengeFilterModal from '@/components/explore/ChallengeFilterModal';
+import CreateChallengeForm from '@/components/CreateChallengeForm';
 import { challengeMapMarkersStyles, challengeListStyles as styles } from "@/constants/styles";
 import { theme } from "@/constants/theme";
 import { ChallengeLocation } from "@/constants/types";
-import { createChallenge, fetchChallenges } from "@/lib/challenges";
+import { fetchChallenges } from "@/lib/challenges";
 import { filterChallengesByStartDate, searchChallengesByName, type ChallengeStartDateFilter } from '@/lib/filter';
 import { getChallengeDate } from '@/utils/challenge-dates';
 import {
     ActivityIndicator,
-    Alert,
     Keyboard,
-    KeyboardAvoidingView,
+    Modal,
     Platform,
     Pressable,
     StyleSheet,
@@ -76,14 +76,9 @@ export default function ExploreScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    // Draft challenge: set by long-pressing the map, cleared once saved or cancelled
+    // Draft challenge: set by long-pressing the map, cleared once saved or cancelled.
+    //   While set, the create-challenge form is open with this spot already chosen.
     const [draftCoordinate, setDraftCoordinate] = useState<LatLng | null>(null);
-    const [draftTitle, setDraftTitle] = useState('');
-    const [draftDescription, setDraftDescription] = useState('');
-    const [isSaving, setIsSaving] = useState(false);        // true while saving; blocks double submits
-
-    // Both fields need text before the challenge can be saved (same rule as the full form)
-    const isDraftValid = draftTitle.trim().length > 0 && draftDescription.trim().length > 0;
 
     const focusChallenge = useCallback((challenge: ChallengeLocation | null) => {
         setSelectedLocation(challenge);
@@ -244,7 +239,6 @@ export default function ExploreScreen() {
     }, [reloadCount, searchQuery, focusChallenge]);
 
     const submitSearch = (text: string) => {
-        if (isSaving) return;
         searchVersion.current += 1;
         Keyboard.dismiss();
         setSearchQuery(text.trim());
@@ -255,7 +249,6 @@ export default function ExploreScreen() {
     };
 
     const clearSearchResults = () => {
-        if (isSaving) return;
         searchVersion.current += 1;
         Keyboard.dismiss();
         setSearchDraft('');
@@ -284,45 +277,26 @@ export default function ExploreScreen() {
     const handleLongPress = (event: LongPressEvent) => {
         setSelectedLocation(null);          // hide any open challenge card so the popups can't overlap
         setDraftCoordinate(event.nativeEvent.coordinate);
-        setDraftTitle('');
-        setDraftDescription('');
     }
 
-    // Closes the popup and removes the dropped pin
+    // Closes the form and removes the dropped pin
     const cancelDraft = () => setDraftCoordinate(null);
 
-    // KEY HANDLER: SAVE THE NEW CHALLENGE
-    const saveDraft = async () => {
-        // STEP 1: Make sure there's a spot on the map and we're not already saving
-        if (!draftCoordinate || isSaving) return;
-        setIsSaving(true);
+    // KEY HANDLER: NEW CHALLENGE SAVED
+    // The form saves the challenge and shows the confirmation; here we just put it on the map
+    const handleChallengeCreated = (created: ChallengeLocation) => {
+        if (!draftCoordinate) return;
 
-        try {
-            // STEP 2: Save the challenge at the pressed coordinate (see src/lib/challenges.ts)
-            const created = await createChallenge({
-                title: draftTitle,
-                description: draftDescription,
-                ...draftCoordinate,
-            });
-
-            // STEP 3: Add the pin to the map straight away, so it shows without a reload
-            //   Keep the coordinate we pressed: the markers need real numbers, and fetchChallenges
-            //   is the only thing that coerces what the database sends back
-            const newChallenge = {...created, ...draftCoordinate};
-            setLocations((current) => [...current, newChallenge]);
-            if (defaultChallenges.current) {
-                defaultChallenges.current = [...defaultChallenges.current, newChallenge]
-                    .sort((a, b) => a.title.localeCompare(b.title));
-            }
-            setDraftCoordinate(null);
-            Alert.alert('Challenge created', `"${created.title}" is now live on the map.`);
-        } catch (err: any) {
-            // STEP 4: On failure, keep the popup open so the user can try again
-            console.error("Could not create challenge: ", err);
-            Alert.alert('Could not create challenge', err?.message ?? 'Something went wrong. Please try again.');
-        } finally {
-            setIsSaving(false);
+        // Add the pin to the map straight away, so it shows without a reload
+        //   Keep the coordinate we pressed: the markers need real numbers, and fetchChallenges
+        //   is the only thing that coerces what the database sends back
+        const newChallenge = {...created, ...draftCoordinate};
+        setLocations((current) => [...current, newChallenge]);
+        if (defaultChallenges.current) {
+            defaultChallenges.current = [...defaultChallenges.current, newChallenge]
+                .sort((a, b) => a.title.localeCompare(b.title));
         }
+        setDraftCoordinate(null);
     }
 
     function SetMarkers(locations:ChallengeLocation[], selectedLocation:ChallengeLocation|null) {
@@ -374,74 +348,6 @@ export default function ExploreScreen() {
         )
     }
 
-    // POPUP FOR A NEW CHALLENGE
-    // Shown after a long press: name it, describe it, and save it at that spot
-    function DisplayNewChallengeCard() {
-        if (!draftCoordinate) return null;
-
-        return(
-            <KeyboardAvoidingView
-                style={challengeMapMarkersStyles.draftSheet}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            >
-                <View style={[challengeMapMarkersStyles.card, {backgroundColor: colors.background}]}>
-                    <Text style={[challengeMapMarkersStyles.cardTitle, {color: colors.text}]}>New challenge here</Text>
-                    <Text style={[challengeMapMarkersStyles.cardBody, {color: colors.inactive}]}>
-                        {draftCoordinate.latitude.toFixed(6)}, {draftCoordinate.longitude.toFixed(6)}
-                    </Text>
-
-                    <TextInput
-                        style={challengeMapMarkersStyles.input}
-                        value={draftTitle}
-                        onChangeText={setDraftTitle}
-                        placeholder="Name"
-                        placeholderTextColor={colors.inactive}
-                        maxLength={80}
-                    />
-                    <TextInput
-                        style={[challengeMapMarkersStyles.input, challengeMapMarkersStyles.inputMultiline]}
-                        value={draftDescription}
-                        onChangeText={setDraftDescription}
-                        placeholder="What should people photograph?"
-                        placeholderTextColor={colors.inactive}
-                        multiline
-                        maxLength={500}
-                    />
-
-                    <View style={challengeMapMarkersStyles.cardButtons}>
-                        <Pressable
-                            style={[
-                                challengeMapMarkersStyles.button,
-                                challengeMapMarkersStyles.buttonInRow,
-                                challengeMapMarkersStyles.buttonSecondary,
-                                isSaving && challengeMapMarkersStyles.buttonDisabled,
-                            ]}
-                            onPress={cancelDraft}
-                            disabled={isSaving}
-                        >
-                            <Text style={challengeMapMarkersStyles.buttonTextSecondary}>Cancel</Text>
-                        </Pressable>
-
-                        <Pressable
-                            style={[
-                                challengeMapMarkersStyles.button,
-                                challengeMapMarkersStyles.buttonInRow,
-                                {backgroundColor: colors.active},
-                                (!isDraftValid || isSaving) && challengeMapMarkersStyles.buttonDisabled,
-                            ]}
-                            onPress={saveDraft}
-                            disabled={!isDraftValid || isSaving}
-                        >
-                            {isSaving
-                                ? <ActivityIndicator color="#FFFFFF" />
-                                : <Text style={challengeMapMarkersStyles.buttonText}>Create challenge</Text>}
-                        </Pressable>
-                    </View>
-                </View>
-            </KeyboardAvoidingView>
-        )
-    }
-
     return(
         <SafeAreaView style={styles.fill} edges={['left', 'right']}>
             <View style={styles.fill}>
@@ -486,9 +392,6 @@ export default function ExploreScreen() {
                     {
                         DisplayChallengeInfoCard() // Displays Challenge information conditionally, ie if a location has been selected
                     }
-                    {
-                        DisplayNewChallengeCard()  // Displays the new-challenge popup after a long press
-                    }
                 </View>}
                 <View style={[styles.searchBar, {top: insets.top + 16}]}>
                     <Ionicons name="search-outline" size={22} color={colors.inactive} />
@@ -499,7 +402,6 @@ export default function ExploreScreen() {
                         placeholderTextColor={colors.inactive}
                         value={searchDraft}
                         onChangeText={setSearchDraft}
-                        editable={!isSaving}
                         autoCapitalize="none"
                         autoCorrect={false}
                         returnKeyType="search"
@@ -520,20 +422,17 @@ export default function ExploreScreen() {
                 <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={hasDateFilter ? 'Filters, start date filter applied' : 'Filters'}
-                    accessibilityState={{expanded: filtersVisible, disabled: isSaving}}
-                    disabled={isSaving}
+                    accessibilityState={{expanded: filtersVisible}}
                     onPress={() => {Keyboard.dismiss(); setFiltersVisible(true);}}
-                    style={({pressed}) => [styles.toggleButton, {top: insets.top + 16}, styles.filterButton, hasDateFilter && styles.filterActive, (pressed || isSaving) && styles.pressed]}
+                    style={({pressed}) => [styles.toggleButton, {top: insets.top + 16}, styles.filterButton, hasDateFilter && styles.filterActive, pressed && styles.pressed]}
                 >
                     <Ionicons name={hasDateFilter ? 'funnel' : 'funnel-outline'} size={24} color={hasDateFilter ? colors.background : colors.text} />
                 </Pressable>
                 <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={viewMode === 'map' ? 'Switch to list view' : 'Switch to map view'}
-                    accessibilityState={{disabled: isSaving}}
-                    disabled={isSaving}
                     onPress={() => {Keyboard.dismiss(); setViewMode((current) => current === 'map' ? 'list' : 'map');}}
-                    style={({pressed}) => [styles.toggleButton, {top: insets.top + 16}, (pressed || isSaving) && styles.pressed]}
+                    style={({pressed}) => [styles.toggleButton, {top: insets.top + 16}, pressed && styles.pressed]}
                 >
                     <Ionicons
                         name={viewMode === 'map' ? 'list-outline' : 'map-outline'}
@@ -546,9 +445,8 @@ export default function ExploreScreen() {
                         <Pressable
                             accessibilityRole="button"
                             accessibilityLabel={hasDateFilter ? 'Clear search and keep date filters' : 'Clear search and show all challenges'}
-                            disabled={isSaving}
-                            onPress={clearSearchResults}
-                            style={({pressed}) => [styles.clearResultsButton, (pressed || isSaving) && styles.pressed]}
+                                    onPress={clearSearchResults}
+                            style={({pressed}) => [styles.clearResultsButton, pressed && styles.pressed]}
                         >
                             {/* <Ionicons name="close-outline" size={20} color={colors.text} /> */}
                             <Text style={styles.clearResultsText}>Clear search</Text>
@@ -556,6 +454,16 @@ export default function ExploreScreen() {
                     </View>
                 )}
             </View>
+            {/* CREATE CHALLENGE FORM: opened by a long press, with that spot already chosen */}
+            {draftCoordinate && (
+                <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={cancelDraft}>
+                    <CreateChallengeForm
+                        fixedCoordinate={draftCoordinate}
+                        onCreated={handleChallengeCreated}
+                        onCancel={cancelDraft}
+                    />
+                </Modal>
+            )}
             {filtersVisible && (
                 <ChallengeFilterModal
                     filters={startDateFilter}

@@ -1,5 +1,5 @@
 // CHALLENGE CAMERA
-// Take a photo (or pick one from the phone), preview it, then submit it to ONE challenge.
+// Take a photo, preview it, then submit it to ONE challenge.
 // Only opened from a challenge's page, and the photo can only go to that challenge.
 // Each photo keeps the spot it was taken at, and is only accepted inside the challenge's radius.
 
@@ -9,7 +9,6 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 // React and Expo functions and components
 import {ActivityIndicator, Alert, Image, Linking, Pressable, StyleSheet, Text, View} from 'react-native';
 import {CameraView, useCameraPermissions, type CameraType} from 'expo-camera';
-import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import {LocationAccuracy} from 'expo-location';
 import {useFocusEffect} from 'expo-router';
@@ -20,28 +19,6 @@ import {PhotoLocationError, uploadPhotoToChallenge} from '@/lib/photos';
 import SubmissionsGallery from '@/components/capture/SubmissionsGallery';
 import RoundButton from '@/components/capture/ButtonRound';
 import TextButton from '@/components/capture/ButtonWithText';
-
-
-// READ LOCATION FROM A LIBRARY PHOTO
-// Photos picked from the phone carry where they were taken in their EXIF data (if the phone saved it).
-// iOS gives "GPSLatitude" + "GPSLatitudeRef" ('N'/'S'); some versions nest it under "{GPS}" instead.
-// Android may already give a signed number. Returns null if there's no usable location.
-function locationFromExif(exif: Record<string, any> | null | undefined): PhotoLocation | null {
-    if (!exif) return null;
-    const nested = exif['{GPS}'] ?? {};
-    let latitude = Number(exif.GPSLatitude ?? nested.Latitude);
-    let longitude = Number(exif.GPSLongitude ?? nested.Longitude);
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
-
-    // A positive number with an 'S' or 'W' ref means the sign hasn't been applied yet
-    const latRef = exif.GPSLatitudeRef ?? nested.LatitudeRef;
-    const lonRef = exif.GPSLongitudeRef ?? nested.LongitudeRef;
-    if (latRef === 'S' && latitude > 0) latitude = -latitude;
-    if (lonRef === 'W' && longitude > 0) longitude = -longitude;
-
-    if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
-    return {latitude, longitude};
-}
 
 
 type ChallengeCameraProps = {
@@ -58,7 +35,6 @@ export default function ChallengeCamera({challenge, onClose}: ChallengeCameraPro
     // Camera config
     const [facing, setFacing] = useState<CameraType>('back');       // initial set up is back camera activated. I imagine most cases would be this. Some challenges could prompt selfies with a location though. Privacy convern?
     const [photoUri, setPhotoUri] = useState<string|null>(null);
-    const [photoMimeType, setPhotoMimeType] = useState('image/jpeg'); // file type of the current photo (camera photos are always JPEG)
     const [isCapturing, setIsCapturing] = useState(false);          // state determines whether user is taking a photo & blocks double tap based on that
     const [photoLocation, setPhotoLocation] = useState<PhotoLocation | null>(null);   // where the current photo was taken (null = unknown)
 
@@ -136,7 +112,6 @@ export default function ChallengeCamera({challenge, onClose}: ChallengeCameraPro
             ]);
             if (photo) {
                 setPhotoUri(photo.uri);         // if we received from the async fn, then we set the URI of the photo we just captured
-                setPhotoMimeType('image/jpeg');
                 setPhotoLocation(location);
             }
         } catch (err) {
@@ -158,27 +133,6 @@ export default function ChallengeCamera({challenge, onClose}: ChallengeCameraPro
     // Opens the gallery of photos this user has submitted (see src/components/capture/SubmissionsGallery.tsx)
     const handleViewGallery = () => setIsGalleryOpen(true);
 
-    // KEY HANDLER: UPLOAD FROM PHONE
-    // Lets the user pick an existing photo instead of taking a new one
-    const handleUploadFromPhone = async () => {
-        // STEP 1: Open the phone's photo library (images only; no permission prompt needed)
-        //   exif: true gives us the photo's saved location, if it has one
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images'],
-            quality: 0.7,
-            exif: true,
-        });
-
-        // STEP 2: Stop if the user closed the library without choosing anything
-        if (result.canceled) return;
-
-        // STEP 3: Show the chosen photo in the same preview screen used for camera photos
-        const asset = result.assets[0];
-        setPhotoUri(asset.uri);
-        setPhotoMimeType(asset.mimeType ?? 'image/jpeg');
-        setPhotoLocation(locationFromExif(asset.exif));   // where the photo was taken, not where the user is now
-    }
-
     // KEY HANDLER: SUBMIT TO THIS CHALLENGE
     // Uploads the photo and enters it into the challenge this camera was opened from
     const handleSubmit = async () => {
@@ -191,7 +145,7 @@ export default function ChallengeCamera({challenge, onClose}: ChallengeCameraPro
         try {
             // STEP 3: Upload the photo and record the submission (see src/lib/photos.ts)
             //   Also checks the photo was taken inside the challenge's radius
-            await uploadPhotoToChallenge(photoUri, challenge, photoLocation, photoMimeType);
+            await uploadPhotoToChallenge(photoUri, challenge, photoLocation);
 
             // STEP 4: Confirm success and go back to the camera
             Alert.alert('Photo submitted!', `Your photo was entered into "${challenge.title}".`);
@@ -283,8 +237,8 @@ export default function ChallengeCamera({challenge, onClose}: ChallengeCameraPro
                     <View style={photoCaptureStyles.shutterCenter} />
                 </Pressable>
 
-                {/* UPLOAD BUTTON*/}
-                <RoundButton icon="cloud-upload-outline" label="Upload from gallery" onPress={handleUploadFromPhone} />
+                {/* Empty space the size of a round button, so the shutter stays centred */}
+                <View style={{width: 52, height: 52}} />
             </View>
 
             {/* GALLERY POPUP (hidden until the gallery button is pressed) */}

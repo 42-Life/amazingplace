@@ -1,12 +1,14 @@
 // CREATE CHALLENGE FORM
 // Three-step form for making a new challenge: details, then location (and radius), then a final review.
+// Used by the Challenges tab, and by the map's long-press (which passes in the location already chosen,
+// so step 2 only sets the radius).
 
 // KEY IMPORTS
 // Hooks
 import {useState} from 'react';
 // React and Expo functions and components
 import {ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View} from 'react-native';
-import MapView, {Circle, type Region} from 'react-native-maps';
+import MapView, {Circle, type LatLng, type Region} from 'react-native-maps';
 import {Slider} from '@expo/ui/community/slider';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Ionicons} from '@expo/vector-icons';
@@ -14,6 +16,7 @@ import {Ionicons} from '@expo/vector-icons';
 import {theme} from '@/constants/theme';
 import {createChallengeStyles as styles} from '@/constants/styles';
 import {createChallenge} from '@/lib/challenges';
+import type {ChallengeLocation} from '@/constants/types';
 
 // Where the map starts on step 2: BU College of Arts and Sciences
 const START_REGION: Region = {
@@ -32,26 +35,35 @@ const DEFAULT_RADIUS_M = 100;
 // Shown as "250 m" or "1 km"
 const formatRadius = (meters: number) => meters >= 1000 ? `${meters / 1000} km` : `${meters} m`;
 
+// Map zoom that fits the whole radius circle on screen, centered on the pin
+const regionForRadius = (center: LatLng, radiusM: number): Region => {
+    const delta = (radiusM * 2.5) / 111000;     // ~111 km per degree of latitude; 2.5 leaves a margin around the circle
+    return {...center, latitudeDelta: delta, longitudeDelta: delta};
+}
+
 const TOTAL_STEPS = 3;
-const STEP_TITLES = ['Details', 'Location', 'Review'];
 
 
 // PROPS
-// Optional, so the Challenges tab can keep rendering <CreateChallengeForm /> as before
+// All optional, so the Challenges tab can keep rendering <CreateChallengeForm /> as before
 type CreateChallengeFormProps = {
-    onCreated?: () => void,     // called after a successful save; the form resets itself if absent
+    fixedCoordinate?: LatLng,                           // location already chosen (map long-press); the user can't move it
+    onCreated?: (created: ChallengeLocation) => void,   // called after a successful save; the form resets itself if absent
+    onCancel?: () => void,                              // shows a Cancel button on step 1 when given
 }
 
 
 // MAIN FUNCTION
-export default function CreateChallengeForm({onCreated}: CreateChallengeFormProps) {
+export default function CreateChallengeForm({fixedCoordinate, onCreated, onCancel}: CreateChallengeFormProps) {
     const {colors} = theme;
+    const startCoordinate = fixedCoordinate ?? {latitude: START_REGION.latitude, longitude: START_REGION.longitude};
+    const stepTitles = ['Details', fixedCoordinate ? 'Radius' : 'Location', 'Review'];
 
     // Form state
     const [step, setStep] = useState(1);
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [coordinate, setCoordinate] = useState({latitude: START_REGION.latitude, longitude: START_REGION.longitude});   // the spot under the pin
+    const [coordinate, setCoordinate] = useState(startCoordinate);   // the spot under the pin
     const [radiusM, setRadiusM] = useState(DEFAULT_RADIUS_M);        // photos must be taken within this many meters of the pin
     const [isSubmitting, setIsSubmitting] = useState(false);         // true while saving; blocks double submits
 
@@ -64,13 +76,13 @@ export default function CreateChallengeForm({onCreated}: CreateChallengeFormProp
         setStep(1);
         setTitle('');
         setDescription('');
-        setCoordinate({latitude: START_REGION.latitude, longitude: START_REGION.longitude});
+        setCoordinate(startCoordinate);
         setRadiusM(DEFAULT_RADIUS_M);
     }
 
     // Back to a blank form, unless the caller wants to take over
-    const finish = () => {
-        if (onCreated) onCreated();
+    const finish = (created: ChallengeLocation) => {
+        if (onCreated) onCreated(created);
         else resetForm();
     }
 
@@ -84,7 +96,7 @@ export default function CreateChallengeForm({onCreated}: CreateChallengeFormProp
 
             // STEP 2: Confirm success
             Alert.alert('Challenge created', `"${created.title}" is now live on the map.`);
-            finish();
+            finish(created);
         } catch (err: any) {
             Alert.alert('Could not create challenge', err?.message ?? 'Something went wrong. Please try again.');
         } finally {
@@ -127,10 +139,24 @@ export default function CreateChallengeForm({onCreated}: CreateChallengeFormProp
     //   The pin never moves on screen. The user drags the map under it,
     //   and whatever is at the centre when they let go is the location.
     //   The slider below sets how far from the pin photos may be taken (drawn as a circle).
+    //   With a fixedCoordinate the map is locked on that spot and zooms to fit the circle instead.
     function LocationStep() {
         return(
             <View style={styles.body}>
             <View style={styles.mapWrapper}>
+                {fixedCoordinate ? (
+                    <MapView
+                        style={{flex: 1}}
+                        region={regionForRadius(coordinate, radiusM)}
+                        mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
+                        scrollEnabled={false}
+                        zoomEnabled={false}
+                        rotateEnabled={false}
+                        pitchEnabled={false}
+                    >
+                        <Circle center={coordinate} radius={radiusM} strokeColor={colors.active} fillColor="rgba(255, 90, 54, 0.15)" />
+                    </MapView>
+                ) : (
                 <MapView
                     style={{flex: 1}}
                     initialRegion={{...START_REGION, ...coordinate}}   // reopens where the user left off if they came back from step 3
@@ -139,6 +165,7 @@ export default function CreateChallengeForm({onCreated}: CreateChallengeFormProp
                 >
                     <Circle center={coordinate} radius={radiusM} strokeColor={colors.active} fillColor="rgba(255, 90, 54, 0.15)" />
                 </MapView>
+                )}
                 <View style={styles.pinCentered} pointerEvents="none">
                     <Ionicons name="location" size={40} color={colors.active} />
                 </View>
@@ -190,7 +217,7 @@ export default function CreateChallengeForm({onCreated}: CreateChallengeFormProp
                 <View style={styles.reviewMap}>
                     <MapView
                         style={{flex: 1}}
-                        region={{latitudeDelta: 0.005, longitudeDelta: 0.005, ...coordinate}}
+                        region={regionForRadius(coordinate, radiusM)}
                         mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
                         scrollEnabled={false}
                         zoomEnabled={false}
@@ -212,9 +239,9 @@ export default function CreateChallengeForm({onCreated}: CreateChallengeFormProp
             {/* HEADER: title, which step we're on, and a progress bar */}
             <View style={styles.header}>
                 <Text style={styles.title}>New Challenge</Text>
-                <Text style={styles.stepLabel}>Step {step} of {TOTAL_STEPS}: {STEP_TITLES[step - 1]}</Text>
+                <Text style={styles.stepLabel}>Step {step} of {TOTAL_STEPS}: {stepTitles[step - 1]}</Text>
                 <View style={styles.progressTrack}>
-                    {STEP_TITLES.map((_, i) => (
+                    {stepTitles.map((_, i) => (
                         <View key={i} style={[styles.progressSegment, i < step && styles.progressSegmentDone]} />
                     ))}
                 </View>
@@ -227,6 +254,14 @@ export default function CreateChallengeForm({onCreated}: CreateChallengeFormProp
 
             {/* FOOTER: back and next/submit */}
             <View style={styles.footer}>
+                {step === 1 && onCancel && (
+                    <Pressable
+                        style={[styles.button, styles.buttonSecondary]}
+                        onPress={onCancel}
+                    >
+                        <Text style={[styles.buttonText, styles.buttonTextSecondary]}>Cancel</Text>
+                    </Pressable>
+                )}
                 {step > 1 && (
                     <Pressable
                         style={[styles.button, styles.buttonSecondary, isSubmitting && styles.buttonDisabled]}

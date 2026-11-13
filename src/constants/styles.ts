@@ -130,39 +130,6 @@ export const challengeMapMarkersStyles = StyleSheet.create({
         alignItems: 'center',
     },
     buttonText: {color: '#FFFFFF', fontWeight: '600'},
-
-    // Popup for the challenge started by long-pressing the map.
-    // Sits at the bottom like the info card, but has to lift clear of the keyboard.
-    draftSheet: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-    },
-    input: {
-        borderWidth: 1,
-        borderColor: colors.tabBarBorder,
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        fontSize: 15,
-        color: colors.text,
-    },
-    inputMultiline: {
-        minHeight: 72,
-        textAlignVertical: 'top',
-    },
-
-    // Cancel and Create sit side by side under the inputs
-    cardButtons: {flexDirection: 'row', gap: 10},
-    buttonInRow: {flex: 1},
-    buttonSecondary: {
-        backgroundColor: colors.background,
-        borderWidth: 1,
-        borderColor: colors.tabBarBorder,
-    },
-    buttonTextSecondary: {color: colors.text, fontWeight: '600'},
-    buttonDisabled: {opacity: 0.4},
 })
 
 export const photoCaptureStyles = StyleSheet.create({
