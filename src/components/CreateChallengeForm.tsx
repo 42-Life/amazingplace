@@ -16,6 +16,8 @@ import {Ionicons} from '@expo/vector-icons';
 import {theme} from '@/constants/theme';
 import {createChallengeStyles as styles} from '@/constants/styles';
 import {createChallenge} from '@/lib/challenges';
+import DateSelector from '@/components/explore/DateSelector';
+import {getChallengeDate} from '@/utils/challenge-dates';
 import type {ChallengeLocation} from '@/constants/types';
 
 // Where the map starts on step 2: BU College of Arts and Sciences
@@ -31,6 +33,9 @@ const MIN_RADIUS_M = 25;
 const MAX_RADIUS_M = 1000;
 const RADIUS_STEP_M = 25;
 const DEFAULT_RADIUS_M = 100;
+
+// Shown as "Nov 20, 2026" (the date is read at midday so time zones can't shift it a day)
+const formatDate = (value: string) => new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'});
 
 // Shown as "250 m" or "1 km"
 const formatRadius = (meters: number) => meters >= 1000 ? `${meters / 1000} km` : `${meters} m`;
@@ -65,10 +70,11 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
     const [description, setDescription] = useState('');
     const [coordinate, setCoordinate] = useState(startCoordinate);   // the spot under the pin
     const [radiusM, setRadiusM] = useState(DEFAULT_RADIUS_M);        // photos must be taken within this many meters of the pin
+    const [endAt, setEndAt] = useState('');                         // last day of the challenge, YYYY-MM-DD ('' = not picked yet)
     const [isSubmitting, setIsSubmitting] = useState(false);         // true while saving; blocks double submits
 
-    // Step 1 is only done once both fields have text
-    const isDetailsValid = title.trim().length > 0 && description.trim().length > 0;
+    // Step 1 is only done once both fields have text and an end date is picked
+    const isDetailsValid = title.trim().length > 0 && description.trim().length > 0 && endAt !== '';
     const canGoNext = step === 1 ? isDetailsValid : true;
 
     // Reset the form back to a blank step 1
@@ -78,6 +84,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
         setDescription('');
         setCoordinate(startCoordinate);
         setRadiusM(DEFAULT_RADIUS_M);
+        setEndAt('');
     }
 
     // Back to a blank form, unless the caller wants to take over
@@ -92,7 +99,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
         setIsSubmitting(true);
         try {
             // STEP 1: Save the challenge
-            const created = await createChallenge({title, description, ...coordinate, radius_m: radiusM});
+            const created = await createChallenge({title, description, ...coordinate, radius_m: radiusM, end_at: endAt});
 
             // STEP 2: Confirm success
             Alert.alert('Challenge created', `"${created.title}" is now live on the map.`);
@@ -130,6 +137,15 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
                         maxLength={500}
                     />
                     <Text style={styles.hint}>{description.length}/500</Text>
+
+                    <Text style={styles.label}>End date</Text>
+                    <DateSelector
+                        label="End date"
+                        value={endAt}
+                        onChange={setEndAt}
+                        minimumDate={getChallengeDate()}
+                    />
+                    <Text style={styles.hint}>The challenge runs through the end of this day.</Text>
                 </ScrollView>
             </KeyboardAvoidingView>
         )
@@ -209,6 +225,9 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
 
                 <Text style={styles.label}>Longitude</Text>
                 <Text style={styles.reviewValue}>{coordinate.longitude.toFixed(6)}</Text>
+
+                <Text style={styles.label}>Ends</Text>
+                <Text style={styles.reviewValue}>{formatDate(endAt)}</Text>
 
                 <Text style={styles.label}>Photo radius</Text>
                 <Text style={styles.reviewValue}>{formatRadius(radiusM)}</Text>
