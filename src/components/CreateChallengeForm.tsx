@@ -70,11 +70,18 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
     const [description, setDescription] = useState('');
     const [coordinate, setCoordinate] = useState(startCoordinate);   // the spot under the pin
     const [radiusM, setRadiusM] = useState(DEFAULT_RADIUS_M);        // photos must be taken within this many meters of the pin
+    const [startAt, setStartAt] = useState(getChallengeDate());      // first day of the challenge, YYYY-MM-DD (starts as today)
     const [endAt, setEndAt] = useState('');                         // last day of the challenge, YYYY-MM-DD ('' = not picked yet)
     const [isSubmitting, setIsSubmitting] = useState(false);         // true while saving; blocks double submits
 
-    // Step 1 is only done once both fields have text and an end date is picked
-    const isDetailsValid = title.trim().length > 0 && description.trim().length > 0 && endAt !== '';
+    // Step 1 is only done once both fields have text and both dates are picked
+    const isDetailsValid = title.trim().length > 0 && description.trim().length > 0 && startAt !== '' && endAt !== '';
+
+    // Changing the start date clears an end date that would now come before it
+    const changeStartAt = (value: string) => {
+        setStartAt(value);
+        if (endAt && value && endAt < value) setEndAt('');
+    }
     const canGoNext = step === 1 ? isDetailsValid : true;
 
     // Reset the form back to a blank step 1
@@ -84,6 +91,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
         setDescription('');
         setCoordinate(startCoordinate);
         setRadiusM(DEFAULT_RADIUS_M);
+        setStartAt(getChallengeDate());
         setEndAt('');
     }
 
@@ -99,7 +107,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
         setIsSubmitting(true);
         try {
             // STEP 1: Save the challenge
-            const created = await createChallenge({title, description, ...coordinate, radius_m: radiusM, end_at: endAt});
+            const created = await createChallenge({title, description, ...coordinate, radius_m: radiusM, start_at: startAt, end_at: endAt});
 
             // STEP 2: Confirm success
             Alert.alert('Challenge created', `"${created.title}" is now live on the map.`);
@@ -138,14 +146,22 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
                     />
                     <Text style={styles.hint}>{description.length}/500</Text>
 
+                    <Text style={styles.label}>Start date</Text>
+                    <DateSelector
+                        label="Start date"
+                        value={startAt}
+                        onChange={changeStartAt}
+                        minimumDate={getChallengeDate()}
+                    />
+
                     <Text style={styles.label}>End date</Text>
                     <DateSelector
                         label="End date"
                         value={endAt}
                         onChange={setEndAt}
-                        minimumDate={getChallengeDate()}
+                        minimumDate={startAt || getChallengeDate()}   // can't end before it starts
                     />
-                    <Text style={styles.hint}>The challenge runs through the end of this day.</Text>
+                    <Text style={styles.hint}>The challenge runs from the start of the first day through the end of the last.</Text>
                 </ScrollView>
             </KeyboardAvoidingView>
         )
@@ -225,6 +241,9 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
 
                 <Text style={styles.label}>Longitude</Text>
                 <Text style={styles.reviewValue}>{coordinate.longitude.toFixed(6)}</Text>
+
+                <Text style={styles.label}>Starts</Text>
+                <Text style={styles.reviewValue}>{formatDate(startAt)}</Text>
 
                 <Text style={styles.label}>Ends</Text>
                 <Text style={styles.reviewValue}>{formatDate(endAt)}</Text>

@@ -79,9 +79,10 @@ export async function fetchChallengeById(id: string): Promise<ChallengeLocation 
 
 // NEW CHALLENGE TYPE
 // What the user fills in when creating a challenge (the app picks the id).
-// radius_m and end_at are optional: leave them out and the database uses its defaults.
+// radius_m, start_at and end_at are optional: leave them out and the database uses its defaults.
 export type NewChallenge = Omit<ChallengeLocation, 'id' | 'start_at' | 'radius_m'> & {
     radius_m?: number,
+    start_at?: string,      // first day the challenge runs, as YYYY-MM-DD
     end_at?: string,        // last day the challenge runs, as YYYY-MM-DD
 };
 
@@ -133,12 +134,18 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     const {radius_m} = challenge;
     if (radius_m !== undefined && (!Number.isFinite(radius_m) || radius_m <= 0)) throw new Error('Radius must be more than 0 meters.');
 
-    // STEP 2b: The end date must be a real date, and not in the past
-    //   YYYY-MM-DD strings sort like dates, so a plain < comparison works
-    const {end_at} = challenge;
+    // STEP 2b: Dates must be real, not in the past, and the end can't come before the start
+    //   YYYY-MM-DD strings sort like dates, so plain < comparisons work
+    const {start_at, end_at} = challenge;
+    const today = getChallengeDate();
+    if (start_at !== undefined) {
+        if (!isValidChallengeDate(start_at)) throw new Error('Pick a valid start date.');
+        if (start_at < today) throw new Error('The start date can\'t be in the past.');
+    }
     if (end_at !== undefined) {
         if (!isValidChallengeDate(end_at)) throw new Error('Pick a valid end date.');
-        if (end_at < getChallengeDate()) throw new Error('The end date can\'t be in the past.');
+        if (end_at < today) throw new Error('The end date can\'t be in the past.');
+        if (start_at !== undefined && end_at < start_at) throw new Error('The end date can\'t be before the start date.');
     }
 
     // STEP 3: Make sure the user is signed in
@@ -151,7 +158,7 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     // STEP 5: Insert the challenge and ask the database to send the saved row back
     const {data, error} = await supabase
         .from('challenges')
-        .insert({id, title, description, latitude, longitude, ...(radius_m !== undefined && {radius_m}), ...(end_at !== undefined && {end_at})})
+        .insert({id, title, description, latitude, longitude, ...(radius_m !== undefined && {radius_m}), ...(start_at !== undefined && {start_at}), ...(end_at !== undefined && {end_at})})
         .select('id, title, description, latitude, longitude, start_at, radius_m')
         .single();
 
