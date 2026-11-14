@@ -4,8 +4,8 @@ create table public.submissions (
     image_path text not null,
     created_at timestamptz not null default now(),
     account_id uuid not null default public.current_account_id(),
-    latitude double precision,
-    longitude double precision,
+    latitude double precision not null,
+    longitude double precision not null,
 
     constraint submissions_pkey primary key (id),
     constraint submissions_challenge_id_fkey foreign key (challenge_id)

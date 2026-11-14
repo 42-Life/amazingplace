@@ -79,11 +79,9 @@ export async function fetchChallengeById(id: string): Promise<ChallengeLocation 
 
 // NEW CHALLENGE TYPE
 // What the user fills in when creating a challenge (the app picks the id).
-// radius_m, start_at and end_at are optional: leave them out and the database uses its defaults.
-export type NewChallenge = Omit<ChallengeLocation, 'id' | 'start_at' | 'radius_m'> & {
-    radius_m?: number,
-    start_at?: string,      // first day the challenge runs, as YYYY-MM-DD
-    end_at?: string,        // last day the challenge runs, as YYYY-MM-DD
+// Everything here is required, matching the columns the database won't allow to be null.
+export type NewChallenge = Omit<ChallengeLocation, 'id'> & {
+    end_at: string,         // last day the challenge runs, as YYYY-MM-DD (start_at is the first)
 };
 
 
@@ -131,22 +129,21 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     const {latitude, longitude} = challenge;
     if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) throw new Error('Latitude must be between -90 and 90.');
     if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new Error('Longitude must be between -180 and 180.');
-    const {radius_m} = challenge;
-    if (radius_m !== undefined && (!Number.isFinite(radius_m) || radius_m <= 0)) throw new Error('Radius must be more than 0 meters.');
 
-    // STEP 2b: Dates must be real, not in the past, and the end can't come before the start
+    // STEP 2a: Photos must be taken within this many meters of the pin (database: not null, > 0)
+    const {radius_m} = challenge;
+    if (radius_m == null || !Number.isFinite(radius_m) || radius_m <= 0) throw new Error('Radius must be more than 0 meters.');
+
+    // STEP 2b: Both dates are required (database: not null), must be real dates, not in the past,
+    //   and the end can't come before the start.
+    //   isValidChallengeDate also rejects a missing or empty date.
     //   YYYY-MM-DD strings sort like dates, so plain < comparisons work
     const {start_at, end_at} = challenge;
     const today = getChallengeDate();
-    if (start_at !== undefined) {
-        if (!isValidChallengeDate(start_at)) throw new Error('Pick a valid start date.');
-        if (start_at < today) throw new Error('The start date can\'t be in the past.');
-    }
-    if (end_at !== undefined) {
-        if (!isValidChallengeDate(end_at)) throw new Error('Pick a valid end date.');
-        if (end_at < today) throw new Error('The end date can\'t be in the past.');
-        if (start_at !== undefined && end_at < start_at) throw new Error('The end date can\'t be before the start date.');
-    }
+    if (!start_at || !isValidChallengeDate(start_at)) throw new Error('Pick a valid start date.');
+    if (!end_at || !isValidChallengeDate(end_at)) throw new Error('Pick a valid end date.');
+    if (start_at < today) throw new Error('The start date can\'t be in the past.');
+    if (end_at < start_at) throw new Error('The end date can\'t be before the start date.');
 
     // STEP 3: Make sure the user is signed in
     const {data: {session}} = await supabase.auth.getSession();
@@ -158,7 +155,7 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     // STEP 5: Insert the challenge and ask the database to send the saved row back
     const {data, error} = await supabase
         .from('challenges')
-        .insert({id, title, description, latitude, longitude, ...(radius_m !== undefined && {radius_m}), ...(start_at !== undefined && {start_at}), ...(end_at !== undefined && {end_at})})
+        .insert({id, title, description, latitude, longitude, radius_m, start_at, end_at})
         .select('id, title, description, latitude, longitude, start_at, radius_m')
         .single();
 
