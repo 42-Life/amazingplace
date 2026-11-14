@@ -4,19 +4,20 @@
 // so step 2 only sets the radius).
 
 // KEY IMPORTS
+import TextInput from '@/components/KeyboardTextInput';
 // Hooks
 import {useState} from 'react';
 // React and Expo functions and components
-import {ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View} from 'react-native';
-import MapView, {Circle, type LatLng, type Region} from 'react-native-maps';
+import {ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View} from 'react-native';
+import type {LatLng, Region} from 'react-native-maps';
 import {Slider} from '@expo/ui/community/slider';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {Ionicons} from '@expo/vector-icons';
 // Internal imports
 import {theme} from '@/constants/theme';
 import {createChallengeStyles as styles} from '@/constants/styles';
 import {createChallenge} from '@/lib/challenges';
 import DateSelector from '@/components/explore/DateSelector';
+import ChallengeAreaMap, {formatRadius} from '@/components/ChallengeAreaMap';
 import {getChallengeDate} from '@/utils/challenge-dates';
 import type {ChallengeLocation} from '@/constants/types';
 
@@ -36,15 +37,6 @@ const DEFAULT_RADIUS_M = 100;
 
 // Shown as "Nov 20, 2026" (the date is read at midday so time zones can't shift it a day)
 const formatDate = (value: string) => new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'});
-
-// Shown as "250 m" or "1 km"
-const formatRadius = (meters: number) => meters >= 1000 ? `${meters / 1000} km` : `${meters} m`;
-
-// Map zoom that fits the whole radius circle on screen, centered on the pin
-const regionForRadius = (center: LatLng, radiusM: number): Region => {
-    const delta = (radiusM * 2.5) / 111000;     // ~111 km per degree of latitude; 2.5 leaves a margin around the circle
-    return {...center, latitudeDelta: delta, longitudeDelta: delta};
-}
 
 const TOTAL_STEPS = 3;
 
@@ -123,7 +115,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
     function DetailsStep() {
         return(
             <KeyboardAvoidingView style={styles.body} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
+                <ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}>
                     <Text style={styles.label}>Name</Text>
                     <TextInput
                         style={styles.input}
@@ -175,38 +167,11 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
     function LocationStep() {
         return(
             <View style={styles.body}>
-            <View style={styles.mapWrapper}>
-                {fixedCoordinate ? (
-                    <MapView
-                        style={{flex: 1}}
-                        region={regionForRadius(coordinate, radiusM)}
-                        mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
-                        scrollEnabled={false}
-                        zoomEnabled={false}
-                        rotateEnabled={false}
-                        pitchEnabled={false}
-                    >
-                        <Circle center={coordinate} radius={radiusM} strokeColor={colors.active} fillColor="rgba(255, 90, 54, 0.15)" />
-                    </MapView>
-                ) : (
-                <MapView
-                    style={{flex: 1}}
-                    initialRegion={{...START_REGION, ...coordinate}}   // reopens where the user left off if they came back from step 3
-                    mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
-                    onRegionChangeComplete={(region) => setCoordinate({latitude: region.latitude, longitude: region.longitude})}
-                >
-                    <Circle center={coordinate} radius={radiusM} strokeColor={colors.active} fillColor="rgba(255, 90, 54, 0.15)" />
-                </MapView>
-                )}
-                <View style={styles.pinCentered} pointerEvents="none">
-                    <Ionicons name="location" size={40} color={colors.active} />
-                </View>
-                <View style={styles.coordinateBadge} pointerEvents="none">
-                    <Text style={styles.coordinateBadgeText}>
-                        {coordinate.latitude.toFixed(6)}, {coordinate.longitude.toFixed(6)}
-                    </Text>
-                </View>
-            </View>
+            <ChallengeAreaMap
+                coordinate={coordinate}
+                radiusM={radiusM}
+                onCoordinateChange={fixedCoordinate ? undefined : setCoordinate}
+            />
 
             {/* Radius slider */}
             <View style={styles.radiusPanel}>
@@ -252,22 +217,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
                 <Text style={styles.reviewValue}>{formatRadius(radiusM)}</Text>
 
                 <Text style={styles.label}>Location</Text>
-                <View style={styles.reviewMap}>
-                    <MapView
-                        style={{flex: 1}}
-                        region={regionForRadius(coordinate, radiusM)}
-                        mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
-                        scrollEnabled={false}
-                        zoomEnabled={false}
-                        rotateEnabled={false}
-                        pitchEnabled={false}
-                    >
-                        <Circle center={coordinate} radius={radiusM} strokeColor={colors.active} fillColor="rgba(255, 90, 54, 0.15)" />
-                    </MapView>
-                    <View style={styles.pinCentered} pointerEvents="none">
-                        <Ionicons name="location" size={40} color={colors.active} />
-                    </View>
-                </View>
+                <ChallengeAreaMap coordinate={coordinate} radiusM={radiusM} showCoordinates={false} style={styles.reviewMap} />
             </ScrollView>
         )
     }

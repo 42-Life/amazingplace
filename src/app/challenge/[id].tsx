@@ -4,18 +4,20 @@
 
 // KEY IMPORTS
 // Hooks
-import {useEffect, useState} from 'react';
+import { useEffect, useState } from 'react';
 // React and Expo functions and components
-import {ActivityIndicator, Pressable, Text, View} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {router, useLocalSearchParams} from 'expo-router';
-import {Ionicons} from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 // Internal imports
-import {theme} from '@/constants/theme';
-import {challengeDetailStyles as styles} from '@/constants/styles';
-import type {ChallengeLocation} from '@/constants/types';
-import {fetchChallengeById} from '@/lib/challenges';
 import ChallengeCamera from '@/components/capture/ChallengeCamera';
+import ChallengeSubmissionsGrid from '@/components/capture/ChallengeSubmissionsGrid';
+import ChallengeAreaMap, { formatRadius } from '@/components/ChallengeAreaMap';
+import { challengeDetailStyles as styles } from '@/constants/styles';
+import { theme } from '@/constants/theme';
+import type { ChallengeLocation } from '@/constants/types';
+import { fetchChallengeById } from '@/lib/challenges';
 
 
 // MAIN FUNCTION
@@ -47,8 +49,11 @@ export default function ChallengeScreen() {
                 if (!isMounted) return;
 
                 // Step 3: show it, or say so if the id matched nothing
-                if (result) setChallenge(result);
-                else setErrorMessage('That challenge has ended or no longer exists.');
+                if (result) {
+                    setChallenge(result);
+                } else {
+                    setErrorMessage('That challenge has ended or no longer exists.');
+                }
             }
             catch (err) {
                 // Error handling -- log for developers, show a readable message to users
@@ -71,7 +76,7 @@ export default function ChallengeScreen() {
     }
 
     return(
-        <SafeAreaView style={styles.safe} edges={['top']}>
+        <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
             {/* 1. Header: back to the map */}
             <View style={styles.header}>
                 <Pressable onPress={() => router.back()} accessibilityLabel="Back" hitSlop={12}>
@@ -85,16 +90,39 @@ export default function ChallengeScreen() {
             ) : errorMessage ? (
                 <Text style={[styles.centered, styles.message]}>{errorMessage}</Text>
             ) : challenge && (
-                <View style={styles.body}>
-                    <Text style={styles.title}>{challenge.title}</Text>
-                    <Text style={styles.description}>{challenge.description}</Text>
-                    <Text style={styles.description}>Photos must be taken within {Math.round(challenge.radius_m)} m of this spot.</Text>
-
-                    {/* Opens the camera; any photo taken goes to this challenge */}
-                    <Pressable onPress={() => setIsCameraOpen(true)} accessibilityRole="button">
-                        <Text style={{color: colors.active, fontSize: 16, fontWeight: '600'}}>Take a photo</Text>
-                    </Pressable>
-                </View>
+                <>
+                    <ChallengeSubmissionsGrid
+                        key={challenge.id}
+                        challengeId={challenge.id}
+                        header={(submissionCount) => <View style={styles.details}>
+                            <Text style={styles.title}>{challenge.title}</Text>
+                            <ChallengeAreaMap
+                                coordinate={{latitude: Number(challenge.latitude), longitude: Number(challenge.longitude)}}
+                                radiusM={Number(challenge.radius_m)}
+                                style={styles.areaMap}
+                            />
+                            <Text style={styles.description}>{challenge.description}</Text>
+                            <View style={styles.radiusRow}>
+                                <Text style={styles.areaTitle}>Photo radius: {formatRadius(Number(challenge.radius_m))}</Text>
+                                <Text style={styles.submissionTag} accessibilityLiveRegion="polite">
+                                    {submissionCount === null ? 'Submissions: —' : `${submissionCount.toLocaleString()} ${submissionCount === 1 ? 'submission' : 'submissions'}`}
+                                </Text>
+                            </View>
+                            <Text style={styles.areaTitle}>
+                                End date: {new Date(`${challenge.end_at}T12:00:00`).toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'})}
+                            </Text>
+                        </View>}
+                    />
+                    <View style={styles.footer}>
+                        <Pressable
+                            onPress={() => setIsCameraOpen(true)}
+                            accessibilityRole="button"
+                            style={({pressed}) => [styles.enterButton, pressed && styles.enterButtonPressed]}
+                        >
+                            <Text style={styles.enterButtonText}>Enter Challenge</Text>
+                        </Pressable>
+                    </View>
+                </>
             )}
         </SafeAreaView>
     )

@@ -30,6 +30,7 @@ export type ChallengeLocation = {
     latitude: number
     longitude: number
     start_at: string
+    end_at: string          // last day of the challenge, YYYY-MM-DD
     radius_m: number        // photos must be taken within this many meters of the pin
 }
 

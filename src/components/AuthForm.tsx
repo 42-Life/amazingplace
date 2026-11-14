@@ -2,8 +2,9 @@
 // One form for both creating an account and signing in. A link at the bottom switches between them.
 
 // KEY IMPORTS
+import TextInput from '@/components/KeyboardTextInput';
 import {useState} from 'react';
-import {ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput} from 'react-native';
+import {ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {theme} from '@/constants/theme';
 import {authStyles as styles} from '@/constants/styles';
@@ -45,7 +46,7 @@ export default function AuthForm() {
     return (
         <SafeAreaView style={{flex: 1, backgroundColor: colors.background}}>
             <KeyboardAvoidingView style={{flex: 1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+                <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}>
                     <Text style={styles.title}>{isSignUp ? 'Create account' : 'Sign in'}</Text>
                     <Text style={styles.subtitle}>
                         {isSignUp ? 'Sign up to start entering challenges.' : 'Welcome back.'}
