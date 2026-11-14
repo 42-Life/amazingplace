@@ -25,6 +25,61 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Database (Supabase)
+
+### How it works
+
+- The app's data lives in a **hosted Supabase project**, which is a Postgres database plus login (auth) and file storage.
+- The repo keeps the database structure in two forms:
+
+| Folder | What it is | Do you edit it? |
+|---|---|---|
+| `supabase/schema/` | What the database **should look like right now**: tables, constraints, policies, functions, triggers. One file per table, plus `functions.sql` and `auth.sql`. | **Yes**, this is where you make changes. |
+| `supabase/migrations/` | The **history of changes**, as SQL files that run in order. The hosted database remembers which ones it has already run. | No, these are generated. |
+
+The flow is: edit `schema/` → the CLI writes a migration → you push the migration to the hosted database.
+
+### One-time setup
+
+1. Install the [Supabase CLI](https://supabase.com/docs/guides/cli) (v3 or newer) and [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+2. Log in and link the repo to the hosted project:
+
+   ```bash
+   supabase login
+   supabase link --project-ref xtrhhafbmiygsurnxobg
+   ```
+
+   `link` asks for the **database password**. That's not your Supabase account password. Ask a teammate, or reset it in the dashboard under Project Settings → Database.
+
+### Making a change
+
+1. **Pull first** (`git pull`), so you're working from the latest migrations.
+2. **Edit the SQL** in `supabase/schema/`. Example: to make a column required, change `latitude double precision,` to `latitude double precision not null,`.
+3. **Generate a migration** (Docker must be running):
+
+   ```bash
+   supabase db schema declarative sync --name short_description_of_change
+   ```
+
+   This compares `schema/` to `migrations/` and writes the difference to a new file in `supabase/migrations/`.
+4. **Read the new migration.** The tool guesses. A renamed column, for example, can come out as "drop column + add column", which deletes that column's data. Fix the SQL by hand if needed.
+5. **Push it to the hosted database:**
+
+   ```bash
+   supabase db push --remote
+   ```
+
+   This only runs migrations the hosted database hasn't run yet.
+6. **Commit** the `schema/` change and the new migration together.
+
+### Rules
+
+- **Don't change the schema in the Supabase dashboard.** The repo won't know about it. If it happens anyway, run `supabase db pull --remote` to bring it into `migrations/`, then update `schema/` to match.
+- **Don't edit a migration after it's been pushed.** Fix mistakes with a new migrations.
+- **Check existing data before adding rules.** For example, making a column `not null` fails if any row already has an empty value in that column. Fix or delete those rows first.
+- **Changing data** (insert/update/delete rows) doesn't belong in `schema/`. Run `supabase migration new <name>`, write the SQL in the new file, and push it. Or directly change the data in the Supabase console.
+- **CLI v3 uses a local database by default.** Add `--remote` to `db push` and `db pull` to target the hosted project.
+
 ## Get a fresh project
 
 When you're ready, run:
