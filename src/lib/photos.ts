@@ -97,18 +97,19 @@ export type Submission = {
 export type SubmissionPhoto = Pick<Submission, 'id' | 'imageUrl' | 'createdAt'>;
 
 // Everyone's entries for one challenge, newest first.
-export async function fetchChallengeSubmissions(challengeId: string): Promise<SubmissionPhoto[]> {
-    const {data, error} = await supabase
+export async function fetchChallengeSubmissions(challengeId: string): Promise<{photos: SubmissionPhoto[]; total: number}> {
+    const {data, error, count} = await supabase
         .from('submissions')
-        .select('id, image_path, created_at')
+        .select('id, image_path, created_at', {count: 'exact'})
         .eq('challenge_id', challengeId)
         .order('created_at', {ascending: false});
     if (error) throw error;
-    return (data ?? []).map((row) => ({
+    const photos = (data ?? []).map((row) => ({
         id: row.id,
         imageUrl: supabase.storage.from('photos').getPublicUrl(row.image_path).data.publicUrl,
         createdAt: row.created_at,
     }));
+    return {photos, total: count ?? photos.length};
 }
 
 // FETCH MY SUBMISSIONS

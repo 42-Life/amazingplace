@@ -464,6 +464,8 @@ export const challengeDetailStyles = StyleSheet.create({
 
     // The challenge itself
     details: {gap: 12},
+    radiusRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap'},
+    submissionTag: {fontSize: 13, fontWeight: '600', color: colors.text, backgroundColor: colors.tabBarBorder, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16},
     title: {fontSize: 26, fontWeight: '700', color: colors.text},
     description: {fontSize: 16, color: colors.text},
     area: {gap: 8},

@@ -94,7 +94,7 @@ export default function ChallengeScreen() {
                     <ChallengeSubmissionsGrid
                         key={challenge.id}
                         challengeId={challenge.id}
-                        header={<View style={styles.details}>
+                        header={(submissionCount) => <View style={styles.details}>
                             <Text style={styles.title}>{challenge.title}</Text>
                             <ChallengeAreaMap
                                 coordinate={{latitude: Number(challenge.latitude), longitude: Number(challenge.longitude)}}
@@ -102,7 +102,12 @@ export default function ChallengeScreen() {
                                 style={styles.areaMap}
                             />
                             <Text style={styles.description}>{challenge.description}</Text>
-                            <Text style={styles.areaTitle}>Photo radius: {formatRadius(Number(challenge.radius_m))}</Text>
+                            <View style={styles.radiusRow}>
+                                <Text style={styles.areaTitle}>Photo radius: {formatRadius(Number(challenge.radius_m))}</Text>
+                                <Text style={styles.submissionTag} accessibilityLiveRegion="polite">
+                                    {submissionCount === null ? 'Submissions: —' : `${submissionCount.toLocaleString()} ${submissionCount === 1 ? 'submission' : 'submissions'}`}
+                                </Text>
+                            </View>
                             <Text style={styles.areaTitle}>
                                 End date: {new Date(`${challenge.end_at}T12:00:00`).toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'})}
                             </Text>

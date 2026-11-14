@@ -5,8 +5,9 @@ import {theme} from '@/constants/theme';
 import PhotoGrid, {type GridPhoto} from './PhotoGrid';
 import ImageViewer from './ImageViewer';
 
-export default function ChallengeSubmissionsGrid({challengeId, header}: {challengeId: string; header: ReactElement}) {
+export default function ChallengeSubmissionsGrid({challengeId, header}: {challengeId: string; header: (submissionCount: number | null) => ReactElement}) {
     const [photos, setPhotos] = useState<SubmissionPhoto[]>([]);
+    const [submissionCount, setSubmissionCount] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
     const [revision, setRevision] = useState(0);
@@ -15,7 +16,11 @@ export default function ChallengeSubmissionsGrid({challengeId, header}: {challen
     useEffect(() => {
         let active = true;
         fetchChallengeSubmissions(challengeId)
-            .then((data) => {if (active) setPhotos(data);})
+            .then((data) => {
+                if (!active) return;
+                setPhotos(data.photos);
+                setSubmissionCount(data.total);
+            })
             .catch(() => {if (active) setError(true);})
             .finally(() => {if (active) setLoading(false);});
         return () => {active = false;};
@@ -34,7 +39,7 @@ export default function ChallengeSubmissionsGrid({challengeId, header}: {challen
                 onPhotoPress={setSelected}
                 refreshing={loading}
                 onRefresh={refresh}
-                header={<View style={styles.header}>{header}<Text style={styles.title}>Submissions</Text></View>}
+                header={<View style={styles.header}>{header(submissionCount)}<Text style={styles.title}>Submissions</Text></View>}
                 footer={
                     <View style={styles.status}>
                         {loading ? <ActivityIndicator color={theme.colors.active} accessibilityLabel="Loading submissions" />
