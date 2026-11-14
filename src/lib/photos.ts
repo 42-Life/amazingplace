@@ -5,22 +5,55 @@
 import { supabase } from '@/lib/supabase';
 import { fetchMyAccount } from '@/lib/accounts';
 import {getChallengeDate} from '@/utils/challenge-dates';
+import {distanceInMeters} from '@/utils/distance';
+import type {ChallengeLocation, PhotoLocation} from '@/constants/types';
+
+
+// PHOTO LOCATION ERROR
+// Thrown when a photo can't be entered because of where it was taken (or because we don't know where).
+// Its message is written for users, so the app can show it as is.
+export class PhotoLocationError extends Error {}
+
+
+// CHECK PHOTO LOCATION
+// Makes sure the photo was taken inside the challenge's circle. Throws PhotoLocationError if not.
+//   'asserts' tells TypeScript the location is known after this returns
+export function checkPhotoLocation(challenge: ChallengeLocation, location: PhotoLocation | null): asserts location is PhotoLocation {
+    if (!location) {
+        throw new PhotoLocationError("We don't know where this photo was taken, so it can't be entered. Turn on location and try again.");
+    }
+    const distance = distanceInMeters(challenge, location);
+    if (distance > challenge.radius_m) {
+        throw new PhotoLocationError(
+            `This photo was taken ${Math.round(distance)} m from the challenge. It must be within ${Math.round(challenge.radius_m)} m.`
+        );
+    }
+}
 
 
 // UPLOAD PHOTO TO A CHALLENGE
-// Takes a photo stored on the phone, uploads it, and records it as a submission.
+// Takes a photo stored on the phone, checks it was taken inside the challenge's circle,
+// uploads it, and records it as a submission (with where it was taken).
 // Returns the photo's public web link.
-export async function uploadPhotoToChallenge(localUri: string, challengeId: string, mimeType = 'image/jpeg'): Promise<string> {
+export async function uploadPhotoToChallenge(
+    localUri: string,
+    challenge: ChallengeLocation,
+    location: PhotoLocation | null,
+): Promise<string> {
+    const challengeId = challenge.id;
+
+    // STEP 0: Stop before uploading anything if the photo is outside the challenge area
+    checkPhotoLocation(challenge, location);
+
     // STEP 1: Get the signed-in user (the app only shows its screens to signed-in users)
     const {data: {session}} = await supabase.auth.getSession();
     const user = session?.user;
     if (!user) throw new Error('Please sign in first.');
 
-    // STEP 2: Build the file's path in storage: <userId>/<challengeId>-<timestamp>.<ext>
+    // STEP 2: Build the file's path in storage: <userId>/<challengeId>-<timestamp>.jpg
     //   Starting with the user's ID is required, since the storage rules only let
     //   users upload into their own folder
-    const extension = mimeType.split('/')[1] ?? 'jpg';
-    const filePath = `${user.id}/${challengeId}-${Date.now()}.${extension}`;
+    const filePath = `${user.id}/${challengeId}-${Date.now()}.jpg`;
 
     // STEP 3: Read the photo off the phone as raw bytes
     //   React Native can't upload a file object directly, so we send the bytes instead
@@ -29,13 +62,13 @@ export async function uploadPhotoToChallenge(localUri: string, challengeId: stri
     // STEP 4: Upload the bytes to the "photos" storage bucket
     const {error: uploadError} = await supabase.storage
         .from('photos')
-        .upload(filePath, fileBytes, {contentType: mimeType});
+        .upload(filePath, fileBytes, {contentType: 'image/jpeg'});   // the camera always saves JPEG
     if (uploadError) throw uploadError;
 
     // STEP 5: Record the submission in the database (account_id is filled in automatically from the signed-in user's account)
     const {error: insertError} = await supabase
         .from('submissions')
-        .insert({challenge_id: challengeId, image_path: filePath});
+        .insert({challenge_id: challengeId, image_path: filePath, latitude: location.latitude, longitude: location.longitude});
 
     // STEP 6: If saving the submission failed, delete the uploaded file so nothing is left orphaned
     if (insertError) {

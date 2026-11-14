@@ -56,7 +56,6 @@ export const challengeListStyles = StyleSheet.create({
     },
     clearResultsText: {fontSize: 15, fontWeight: '600', color: colors.text},
     content: {flexGrow: 1, padding: 16, paddingTop: 80, gap: 12},
-    searchResultsContent: {paddingTop: 140},
     centered: {flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12},
     message: {fontSize: 15, color: colors.inactive, textAlign: 'center'},
     retry: {minHeight: 44, padding: 12},
@@ -131,39 +130,6 @@ export const challengeMapMarkersStyles = StyleSheet.create({
         alignItems: 'center',
     },
     buttonText: {color: '#FFFFFF', fontWeight: '600'},
-
-    // Popup for the challenge started by long-pressing the map.
-    // Sits at the bottom like the info card, but has to lift clear of the keyboard.
-    draftSheet: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-    },
-    input: {
-        borderWidth: 1,
-        borderColor: colors.tabBarBorder,
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        fontSize: 15,
-        color: colors.text,
-    },
-    inputMultiline: {
-        minHeight: 72,
-        textAlignVertical: 'top',
-    },
-
-    // Cancel and Create sit side by side under the inputs
-    cardButtons: {flexDirection: 'row', gap: 10},
-    buttonInRow: {flex: 1},
-    buttonSecondary: {
-        backgroundColor: colors.background,
-        borderWidth: 1,
-        borderColor: colors.tabBarBorder,
-    },
-    buttonTextSecondary: {color: colors.text, fontWeight: '600'},
-    buttonDisabled: {opacity: 0.4},
 })
 
 export const photoCaptureStyles = StyleSheet.create({
@@ -354,14 +320,6 @@ export const createChallengeStyles = StyleSheet.create({
         color: colors.inactive,
     },
 
-    // Thumbnail of the photo the challenge was started from (only in the Capture-tab flow)
-    photoPreview: {
-        width: '100%',
-        height: 160,
-        borderRadius: 12,
-        backgroundColor: colors.tabBarBorder,
-        marginTop: 4,
-    },
 
     // Step 2: map with a pin locked to the centre
     mapWrapper: {
@@ -389,6 +347,11 @@ export const createChallengeStyles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
         color: colors.text,
+    },
+    radiusPanel: {
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        gap: 8,
     },
 
     // Step 3: review

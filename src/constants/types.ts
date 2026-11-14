@@ -18,7 +18,6 @@ type TabConfig =  {
 // If adding or removing a main section for the app, use this
 export const TABS: TabConfig[] = [
     {name: 'explore', title: 'Explore', icon: 'map-outline', iconFocused: 'map'},               // Map/Explore section
-    {name: 'index', title: 'Capture', icon: 'camera-outline', iconFocused: 'camera'},           // Photo Capture/Upload section
     {name: 'challenges', title: 'Challenges', icon: 'trophy-outline', iconFocused: 'trophy'},   // Challenge List & Leaderboard section
     {name: 'account', title: 'Account', icon: 'person-outline', iconFocused: 'person'},         // Account/Settings section
 ]
@@ -31,6 +30,13 @@ export type ChallengeLocation = {
     latitude: number
     longitude: number
     start_at: string
+    radius_m: number        // photos must be taken within this many meters of the pin
+}
+
+// Where a photo was taken
+export type PhotoLocation = {
+    latitude: number
+    longitude: number
 }
 
 // for buttons used in photo screen

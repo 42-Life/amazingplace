@@ -1,21 +1,24 @@
 // CREATE CHALLENGE FORM
-// Three-step form for making a new challenge: details, then location, then a final review.
-// When opened from the Capture tab it is handed a photo, which becomes the
-// new challenge's first submission (see src/app/new-challenge.tsx).
+// Three-step form for making a new challenge: details, then location (and radius), then a final review.
+// Used by the Challenges tab, and by the map's long-press (which passes in the location already chosen,
+// so step 2 only sets the radius).
 
 // KEY IMPORTS
 // Hooks
 import {useState} from 'react';
 // React and Expo functions and components
-import {ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View} from 'react-native';
-import MapView, {type Region} from 'react-native-maps';
+import {ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View} from 'react-native';
+import MapView, {Circle, type LatLng, type Region} from 'react-native-maps';
+import {Slider} from '@expo/ui/community/slider';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Ionicons} from '@expo/vector-icons';
 // Internal imports
 import {theme} from '@/constants/theme';
 import {createChallengeStyles as styles} from '@/constants/styles';
 import {createChallenge} from '@/lib/challenges';
-import {uploadPhotoToChallenge} from '@/lib/photos';
+import DateSelector from '@/components/explore/DateSelector';
+import {getChallengeDate} from '@/utils/challenge-dates';
+import type {ChallengeLocation} from '@/constants/types';
 
 // Where the map starts on step 2: BU College of Arts and Sciences
 const START_REGION: Region = {
@@ -25,32 +28,60 @@ const START_REGION: Region = {
     longitudeDelta: 0.01,
 }
 
+// Radius slider: how far from the pin photos may be taken, in meters
+const MIN_RADIUS_M = 25;
+const MAX_RADIUS_M = 1000;
+const RADIUS_STEP_M = 25;
+const DEFAULT_RADIUS_M = 100;
+
+// Shown as "Nov 20, 2026" (the date is read at midday so time zones can't shift it a day)
+const formatDate = (value: string) => new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'});
+
+// Shown as "250 m" or "1 km"
+const formatRadius = (meters: number) => meters >= 1000 ? `${meters / 1000} km` : `${meters} m`;
+
+// Map zoom that fits the whole radius circle on screen, centered on the pin
+const regionForRadius = (center: LatLng, radiusM: number): Region => {
+    const delta = (radiusM * 2.5) / 111000;     // ~111 km per degree of latitude; 2.5 leaves a margin around the circle
+    return {...center, latitudeDelta: delta, longitudeDelta: delta};
+}
+
 const TOTAL_STEPS = 3;
-const STEP_TITLES = ['Details', 'Location', 'Review'];
 
 
 // PROPS
 // All optional, so the Challenges tab can keep rendering <CreateChallengeForm /> as before
 type CreateChallengeFormProps = {
-    photoUri?: string,          // a photo to enter into the challenge once it's created
-    photoMimeType?: string,
-    onCreated?: () => void,     // called after a successful save; the form resets itself if absent
+    fixedCoordinate?: LatLng,                           // location already chosen (map long-press); the user can't move it
+    onCreated?: (created: ChallengeLocation) => void,   // called after a successful save; the form resets itself if absent
+    onCancel?: () => void,                              // shows a Cancel button on step 1 when given
 }
 
 
 // MAIN FUNCTION
-export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jpeg', onCreated}: CreateChallengeFormProps) {
+export default function CreateChallengeForm({fixedCoordinate, onCreated, onCancel}: CreateChallengeFormProps) {
     const {colors} = theme;
+    const startCoordinate = fixedCoordinate ?? {latitude: START_REGION.latitude, longitude: START_REGION.longitude};
+    const stepTitles = ['Details', fixedCoordinate ? 'Radius' : 'Location', 'Review'];
 
     // Form state
     const [step, setStep] = useState(1);
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [coordinate, setCoordinate] = useState({latitude: START_REGION.latitude, longitude: START_REGION.longitude});   // the spot under the pin
+    const [coordinate, setCoordinate] = useState(startCoordinate);   // the spot under the pin
+    const [radiusM, setRadiusM] = useState(DEFAULT_RADIUS_M);        // photos must be taken within this many meters of the pin
+    const [startAt, setStartAt] = useState(getChallengeDate());      // first day of the challenge, YYYY-MM-DD (starts as today)
+    const [endAt, setEndAt] = useState('');                         // last day of the challenge, YYYY-MM-DD ('' = not picked yet)
     const [isSubmitting, setIsSubmitting] = useState(false);         // true while saving; blocks double submits
 
-    // Step 1 is only done once both fields have text
-    const isDetailsValid = title.trim().length > 0 && description.trim().length > 0;
+    // Step 1 is only done once both fields have text and both dates are picked
+    const isDetailsValid = title.trim().length > 0 && description.trim().length > 0 && startAt !== '' && endAt !== '';
+
+    // Changing the start date clears an end date that would now come before it
+    const changeStartAt = (value: string) => {
+        setStartAt(value);
+        if (endAt && value && endAt < value) setEndAt('');
+    }
     const canGoNext = step === 1 ? isDetailsValid : true;
 
     // Reset the form back to a blank step 1
@@ -58,12 +89,15 @@ export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jp
         setStep(1);
         setTitle('');
         setDescription('');
-        setCoordinate({latitude: START_REGION.latitude, longitude: START_REGION.longitude});
+        setCoordinate(startCoordinate);
+        setRadiusM(DEFAULT_RADIUS_M);
+        setStartAt(getChallengeDate());
+        setEndAt('');
     }
 
-    // Back to a blank form, unless the caller wants to take over (the photo flow closes the screen)
-    const finish = () => {
-        if (onCreated) onCreated();
+    // Back to a blank form, unless the caller wants to take over
+    const finish = (created: ChallengeLocation) => {
+        if (onCreated) onCreated(created);
         else resetForm();
     }
 
@@ -72,31 +106,12 @@ export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jp
         if (isSubmitting) return;
         setIsSubmitting(true);
         try {
-            // STEP 1: Save the challenge itself
-            const created = await createChallenge({title, description, ...coordinate});
+            // STEP 1: Save the challenge
+            const created = await createChallenge({title, description, ...coordinate, radius_m: radiusM, start_at: startAt, end_at: endAt});
 
-            // STEP 2: If the user started from a photo, enter it into the challenge they just made
-            //   Wrapped separately: the challenge is already saved at this point, so a failed
-            //   upload must not be reported as a failed creation
-            if (photoUri) {
-                try {
-                    await uploadPhotoToChallenge(photoUri, created.id, photoMimeType);
-                } catch (err) {
-                    console.error("Could not add the photo to the new challenge: ", err);
-                    Alert.alert(
-                        'Challenge created',
-                        `"${created.title}" is now live on the map, but your photo could not be added. You can submit it from the Capture tab.`
-                    );
-                    finish();
-                    return;
-                }
-            }
-
-            // STEP 3: Confirm success
-            Alert.alert('Challenge created', photoUri
-                ? `"${created.title}" is now live on the map, with your photo as its first entry.`
-                : `"${created.title}" is now live on the map.`);
-            finish();
+            // STEP 2: Confirm success
+            Alert.alert('Challenge created', `"${created.title}" is now live on the map.`);
+            finish(created);
         } catch (err: any) {
             Alert.alert('Could not create challenge', err?.message ?? 'Something went wrong. Please try again.');
         } finally {
@@ -131,35 +146,58 @@ export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jp
                     />
                     <Text style={styles.hint}>{description.length}/500</Text>
 
-                    {/* Only in the Capture-tab flow: the photo that will become the first entry */}
-                    {photoUri && (
-                        <>
-                            <Text style={styles.label}>First entry</Text>
-                            <Image
-                                source={{uri: photoUri}}
-                                style={styles.photoPreview}
-                                resizeMode="cover"
-                                accessibilityLabel="The photo that will be entered into this challenge"
-                            />
-                        </>
-                    )}
+                    <Text style={styles.label}>Start date</Text>
+                    <DateSelector
+                        label="Start date"
+                        value={startAt}
+                        onChange={changeStartAt}
+                        minimumDate={getChallengeDate()}
+                    />
+
+                    <Text style={styles.label}>End date</Text>
+                    <DateSelector
+                        label="End date"
+                        value={endAt}
+                        onChange={setEndAt}
+                        minimumDate={startAt || getChallengeDate()}   // can't end before it starts
+                    />
+                    <Text style={styles.hint}>The challenge runs from the start of the first day through the end of the last.</Text>
                 </ScrollView>
             </KeyboardAvoidingView>
         )
     }
 
-    // STEP 2: PICK LOCATION
+    // STEP 2: PICK LOCATION AND RADIUS
     //   The pin never moves on screen. The user drags the map under it,
     //   and whatever is at the centre when they let go is the location.
+    //   The slider below sets how far from the pin photos may be taken (drawn as a circle).
+    //   With a fixedCoordinate the map is locked on that spot and zooms to fit the circle instead.
     function LocationStep() {
         return(
+            <View style={styles.body}>
             <View style={styles.mapWrapper}>
+                {fixedCoordinate ? (
+                    <MapView
+                        style={{flex: 1}}
+                        region={regionForRadius(coordinate, radiusM)}
+                        mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
+                        scrollEnabled={false}
+                        zoomEnabled={false}
+                        rotateEnabled={false}
+                        pitchEnabled={false}
+                    >
+                        <Circle center={coordinate} radius={radiusM} strokeColor={colors.active} fillColor="rgba(255, 90, 54, 0.15)" />
+                    </MapView>
+                ) : (
                 <MapView
                     style={{flex: 1}}
                     initialRegion={{...START_REGION, ...coordinate}}   // reopens where the user left off if they came back from step 3
                     mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
                     onRegionChangeComplete={(region) => setCoordinate({latitude: region.latitude, longitude: region.longitude})}
-                />
+                >
+                    <Circle center={coordinate} radius={radiusM} strokeColor={colors.active} fillColor="rgba(255, 90, 54, 0.15)" />
+                </MapView>
+                )}
                 <View style={styles.pinCentered} pointerEvents="none">
                     <Ionicons name="location" size={40} color={colors.active} />
                 </View>
@@ -168,6 +206,22 @@ export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jp
                         {coordinate.latitude.toFixed(6)}, {coordinate.longitude.toFixed(6)}
                     </Text>
                 </View>
+            </View>
+
+            {/* Radius slider */}
+            <View style={styles.radiusPanel}>
+                <Text style={styles.label}>Photo radius: {formatRadius(radiusM)}</Text>
+                <Slider
+                    value={radiusM}
+                    minimumValue={MIN_RADIUS_M}
+                    maximumValue={MAX_RADIUS_M}
+                    step={RADIUS_STEP_M}
+                    onValueChange={(value) => setRadiusM(Math.round(value / RADIUS_STEP_M) * RADIUS_STEP_M)}
+                    minimumTrackTintColor={colors.active}
+                    accessibilityLabel="Photo radius"
+                />
+                <Text style={styles.hint}>Photos must be taken within this distance of the pin.</Text>
+            </View>
             </View>
         )
     }
@@ -188,17 +242,28 @@ export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jp
                 <Text style={styles.label}>Longitude</Text>
                 <Text style={styles.reviewValue}>{coordinate.longitude.toFixed(6)}</Text>
 
+                <Text style={styles.label}>Starts</Text>
+                <Text style={styles.reviewValue}>{formatDate(startAt)}</Text>
+
+                <Text style={styles.label}>Ends</Text>
+                <Text style={styles.reviewValue}>{formatDate(endAt)}</Text>
+
+                <Text style={styles.label}>Photo radius</Text>
+                <Text style={styles.reviewValue}>{formatRadius(radiusM)}</Text>
+
                 <Text style={styles.label}>Location</Text>
                 <View style={styles.reviewMap}>
                     <MapView
                         style={{flex: 1}}
-                        region={{latitudeDelta: 0.005, longitudeDelta: 0.005, ...coordinate}}
+                        region={regionForRadius(coordinate, radiusM)}
                         mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
                         scrollEnabled={false}
                         zoomEnabled={false}
                         rotateEnabled={false}
                         pitchEnabled={false}
-                    />
+                    >
+                        <Circle center={coordinate} radius={radiusM} strokeColor={colors.active} fillColor="rgba(255, 90, 54, 0.15)" />
+                    </MapView>
                     <View style={styles.pinCentered} pointerEvents="none">
                         <Ionicons name="location" size={40} color={colors.active} />
                     </View>
@@ -212,9 +277,9 @@ export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jp
             {/* HEADER: title, which step we're on, and a progress bar */}
             <View style={styles.header}>
                 <Text style={styles.title}>New Challenge</Text>
-                <Text style={styles.stepLabel}>Step {step} of {TOTAL_STEPS}: {STEP_TITLES[step - 1]}</Text>
+                <Text style={styles.stepLabel}>Step {step} of {TOTAL_STEPS}: {stepTitles[step - 1]}</Text>
                 <View style={styles.progressTrack}>
-                    {STEP_TITLES.map((_, i) => (
+                    {stepTitles.map((_, i) => (
                         <View key={i} style={[styles.progressSegment, i < step && styles.progressSegmentDone]} />
                     ))}
                 </View>
@@ -227,6 +292,14 @@ export default function CreateChallengeForm({photoUri, photoMimeType = 'image/jp
 
             {/* FOOTER: back and next/submit */}
             <View style={styles.footer}>
+                {step === 1 && onCancel && (
+                    <Pressable
+                        style={[styles.button, styles.buttonSecondary]}
+                        onPress={onCancel}
+                    >
+                        <Text style={[styles.buttonText, styles.buttonTextSecondary]}>Cancel</Text>
+                    </Pressable>
+                )}
                 {step > 1 && (
                     <Pressable
                         style={[styles.button, styles.buttonSecondary, isSubmitting && styles.buttonDisabled]}

@@ -1,6 +1,7 @@
 import {ActivityIndicator, FlatList, Pressable, Text, View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import {router} from 'expo-router';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {ChallengeLocation} from '@/constants/types';
 import {challengeListStyles as styles} from '@/constants/styles';
 import {theme} from '@/constants/theme';
@@ -15,6 +16,8 @@ type Props = {
 };
 
 export default function ChallengeList({challenges, isLoading, errorMessage, onRetry, searchQuery, hasDateFilter = false}: Props) {
+    const insets = useSafeAreaInsets();   // status bar height
+
     if (isLoading) {
         return <ActivityIndicator style={styles.centered} color={theme.colors.active} accessibilityLabel="Loading challenges" />;
     }
@@ -33,7 +36,7 @@ export default function ChallengeList({challenges, isLoading, errorMessage, onRe
     return (
         <FlatList
             style={styles.fill}
-            contentContainerStyle={[styles.content, !!searchQuery.trim() && styles.searchResultsContent]}
+            contentContainerStyle={[styles.content, {paddingTop: (searchQuery.trim() ? 140 : 80) + insets.top}]}   // leaves room for the floating search bar below the status bar
             data={challenges}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
