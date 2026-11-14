@@ -41,7 +41,7 @@ export async function searchChallengesByName(name: string): Promise<ChallengeLoc
     ].join(',');
     const {data, error} = await supabase
         .from('challenges')
-        .select('id, title, description, latitude, longitude, start_at')
+        .select('id, title, description, latitude, longitude, start_at, end_at, radius_m')
         .gte('end_at', getChallengeDate())
         .or(filters)
         .order('title');

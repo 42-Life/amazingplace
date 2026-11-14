@@ -2,8 +2,9 @@
 // Lets the signed-in user change their username, email and password, or sign out.
 
 // KEY IMPORTS
+import TextInput from '@/components/KeyboardTextInput';
 import {useEffect, useState} from 'react';
-import {ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput} from 'react-native';
+import {ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {theme} from '@/constants/theme';
 import {authStyles as styles, screenShellStyles} from '@/constants/styles';
@@ -86,7 +87,7 @@ export default function AccountScreen() {
     return (
         <SafeAreaView style={screenShellStyles.safe} edges={['top']}>
             <KeyboardAvoidingView style={{flex: 1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+                <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}>
                     <Text style={styles.title}>Account</Text>
                     {loadError && <Text style={styles.error}>{loadError}</Text>}
 

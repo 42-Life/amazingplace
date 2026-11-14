@@ -360,6 +360,7 @@ export const createChallengeStyles = StyleSheet.create({
         color: colors.text,
     },
     reviewMap: {
+        flex: 0,
         height: 180,
         borderRadius: 12,
         overflow: 'hidden',
@@ -446,6 +447,10 @@ export const authStyles = StyleSheet.create({
 
 export const challengeDetailStyles = StyleSheet.create({
     safe: {flex: 1, backgroundColor: colors.background},
+    footer: {paddingHorizontal: 20, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.tabBarBorder},
+    enterButton: {minHeight: 56, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.active, borderRadius: 12},
+    enterButtonPressed: {opacity: 0.8},
+    enterButtonText: {fontSize: 16, fontWeight: '700', color: colors.buttonIconColor},
 
     // Back button row across the top
     header: {
@@ -458,13 +463,12 @@ export const challengeDetailStyles = StyleSheet.create({
     },
 
     // The challenge itself
-    body: {
-        paddingHorizontal: 20,
-        paddingVertical: 20,
-        gap: 12,
-    },
+    details: {gap: 12},
     title: {fontSize: 26, fontWeight: '700', color: colors.text},
     description: {fontSize: 16, color: colors.text},
+    area: {gap: 8},
+    areaTitle: {fontSize: 16, fontWeight: '600', color: colors.text},
+    areaMap: {flex: 0, width: '100%', aspectRatio: 1.5, borderRadius: 12, overflow: 'hidden'},
 
     // Spinner / messages sit in the middle of the screen
     centered: {flex: 1, textAlign: 'center', textAlignVertical: 'center', marginTop: 40},

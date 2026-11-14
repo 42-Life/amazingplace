@@ -94,6 +94,23 @@ export type Submission = {
     createdAt: string
 }
 
+export type SubmissionPhoto = Pick<Submission, 'id' | 'imageUrl' | 'createdAt'>;
+
+// Everyone's entries for one challenge, newest first.
+export async function fetchChallengeSubmissions(challengeId: string): Promise<SubmissionPhoto[]> {
+    const {data, error} = await supabase
+        .from('submissions')
+        .select('id, image_path, created_at')
+        .eq('challenge_id', challengeId)
+        .order('created_at', {ascending: false});
+    if (error) throw error;
+    return (data ?? []).map((row) => ({
+        id: row.id,
+        imageUrl: supabase.storage.from('photos').getPublicUrl(row.image_path).data.publicUrl,
+        createdAt: row.created_at,
+    }));
+}
+
 // FETCH MY SUBMISSIONS
 // Gets every photo the signed-in user has submitted, newest first (used by the gallery)
 export async function fetchMySubmissions(): Promise<Submission[]> {

@@ -3,6 +3,7 @@
 // or long-press anywhere to create a new challenge on that spot.
 
 // KEY IMPORTS
+import TextInput from '@/components/KeyboardTextInput';
 // React/Expo
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -30,7 +31,6 @@ import {
     Pressable,
     StyleSheet,
     Text,
-    TextInput,
     View
 } from "react-native";
 

@@ -4,7 +4,7 @@
 // KEY IMPORTS
 import type { ChallengeLocation } from '@/constants/types';
 import { supabase } from '@/lib/supabase';
-import {getChallengeDate, isValidChallengeDate} from '@/utils/challenge-dates';
+import { getChallengeDate, isValidChallengeDate } from '@/utils/challenge-dates';
 
 
 // FETCH CHALLENGES
@@ -13,7 +13,7 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
     // STEP 1: Get challenges that have not ended, sorted by title.
     const {data, error} = await supabase
         .from('challenges')
-        .select('id, title, description, latitude, longitude, start_at, radius_m')
+        .select('id, title, description, latitude, longitude, start_at, end_at, radius_m')
         .gte('end_at', getChallengeDate())
         .order('title');
 
@@ -49,6 +49,7 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
             description: challenge.description,
             latitude, longitude,
             start_at: challenge.start_at,
+            end_at: challenge.end_at,
             radius_m: Number(challenge.radius_m),
         }]
     })
@@ -64,7 +65,7 @@ export async function fetchChallengeById(id: string): Promise<ChallengeLocation 
     //   maybeSingle, not single: a missing row comes back as null instead of an error
     const {data, error} = await supabase
         .from('challenges')
-        .select('id, title, description, latitude, longitude, start_at, radius_m')
+        .select('id, title, description, latitude, longitude, start_at, end_at, radius_m')
         .eq('id', id)
         .gte('end_at', getChallengeDate())
         .maybeSingle();
@@ -80,9 +81,7 @@ export async function fetchChallengeById(id: string): Promise<ChallengeLocation 
 // NEW CHALLENGE TYPE
 // What the user fills in when creating a challenge (the app picks the id).
 // Everything here is required, matching the columns the database won't allow to be null.
-export type NewChallenge = Omit<ChallengeLocation, 'id'> & {
-    end_at: string,         // last day the challenge runs, as YYYY-MM-DD (start_at is the first)
-};
+export type NewChallenge = Omit<ChallengeLocation, 'id'>;
 
 
 // GENERATE CHALLENGE ID
@@ -124,17 +123,16 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     if (!title) throw new Error('A challenge needs a title.');
     if (!description) throw new Error('A challenge needs a description.');
 
-    // STEP 2: Make sure the location is a real spot on the map
-    //   Latitude runs from -90 to 90, longitude from -180 to 180
+    // STEP 2a: Make sure latitude runs from -90 to 90, longitude from -180 to 180
     const {latitude, longitude} = challenge;
     if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) throw new Error('Latitude must be between -90 and 90.');
     if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new Error('Longitude must be between -180 and 180.');
 
-    // STEP 2a: Photos must be taken within this many meters of the pin (database: not null, > 0)
+    // STEP 2b: Photos must be taken within this many meters of the pin (database: not null, > 0)
     const {radius_m} = challenge;
     if (radius_m == null || !Number.isFinite(radius_m) || radius_m <= 0) throw new Error('Radius must be more than 0 meters.');
 
-    // STEP 2b: Both dates are required (database: not null), must be real dates, not in the past,
+    // STEP 2c: Both dates are required (database: not null), must be real dates, not in the past,
     //   and the end can't come before the start.
     //   isValidChallengeDate also rejects a missing or empty date.
     //   YYYY-MM-DD strings sort like dates, so plain < comparisons work
@@ -156,7 +154,7 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     const {data, error} = await supabase
         .from('challenges')
         .insert({id, title, description, latitude, longitude, radius_m, start_at, end_at})
-        .select('id, title, description, latitude, longitude, start_at, radius_m')
+        .select('id, title, description, latitude, longitude, start_at, end_at, radius_m')
         .single();
 
     // STEP 6: Stop here if saving failed
