@@ -1,6 +1,9 @@
 // ACCOUNT SCREEN
 // Lets the signed-in user change their username, email and password, or sign out.
 
+// TEMP IMPORTS - TESTING SIGN-IN
+import { router } from 'expo-router';
+
 // KEY IMPORTS
 import TextInput from '@/components/KeyboardTextInput';
 import {useEffect, useState} from 'react';
@@ -8,7 +11,8 @@ import {ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {theme} from '@/constants/theme';
 import {authStyles as styles, screenShellStyles} from '@/constants/styles';
-import {fetchMyAccount, signOut, updateEmail, updatePassword, updateUsername, type Account} from '@/lib/accounts';
+import {fetchMyAccount, signOut, updateEmail, updatePassword, updateUsername} from '@/lib/accounts';
+import {Account} from "@/constants/types";
 
 // FIELD SECTION
 // One labelled input with its own Save button and message line
@@ -129,6 +133,28 @@ export default function AccountScreen() {
                     <Pressable style={styles.secondaryButton} onPress={() => signOut().catch((e) => console.error('Sign-out failed:', e))}>
                         <Text style={styles.secondaryButtonText}>Sign out</Text>
                     </Pressable>
+
+                {/*  TEMP -- FOR TESTING SIGN-IN FLOW  */}
+                {__DEV__ && (
+                    <Pressable
+                        onPress={() => router.push('/auth-preview')}
+                        style={{
+                            margin: 20,
+                            padding: 16,
+                            borderRadius: 12,
+                            backgroundColor: '#FF5A36',
+                            alignItems: 'center',
+                        }}
+                    >
+                        <Text style={{
+                            color: '#FFFFFF',
+                            fontWeight: '700',
+                            fontSize: 16,
+                        }}>
+                            Preview Authentication Flow
+                        </Text>
+                    </Pressable>
+                )}
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>

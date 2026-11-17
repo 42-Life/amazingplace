@@ -8,7 +8,11 @@ import {StatusBar} from "expo-status-bar";
 import {Stack} from "expo-router";
 import type {Session} from "@supabase/supabase-js";
 import {supabase} from "@/lib/supabase";
-import AuthForm from "@/components/AuthForm";
+import AuthForm from "@/components/auth/AuthForm";
+import AuthFlow from "@/components/auth/AuthFlow";
+
+// DEV BYPASS
+const DEV_BYPASS_LOGIN = __DEV__;
 
 // MAIN FUNCTION
 export default function RootLayout() {
@@ -30,7 +34,7 @@ export default function RootLayout() {
     return(
         <>
             <StatusBar style={"auto"}></StatusBar>
-            {session
+            {session || DEV_BYPASS_LOGIN
                 ? <Stack screenOptions={{headerShown: false}}></Stack>
                 : <AuthForm />}
         </>
