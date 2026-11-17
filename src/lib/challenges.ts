@@ -4,6 +4,7 @@
 // KEY IMPORTS
 import type { ChallengeLocation } from '@/constants/types';
 import { supabase } from '@/lib/supabase';
+import { fetchMyAccount } from '@/lib/accounts';
 import { getChallengeDate, isValidChallengeDate } from '@/utils/challenge-dates';
 
 
@@ -54,6 +55,40 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
         }]
     })
 
+}
+
+
+// Challenges this user has submitted a photo to, excluding ended challenges.
+// Querying challenges keeps each challenge in the list once, even with multiple submissions.
+export type ParticipatingChallenge = {
+    id: string;
+    title: string;
+    description: string;
+    joinedAt: string;
+    endAt: string;
+};
+
+export async function fetchParticipatingChallenges(): Promise<ParticipatingChallenge[]> {
+    const account = await fetchMyAccount();
+    if (!account) return [];
+
+    const {data, error} = await supabase
+        .from('challenges')
+        .select('id, title, description, end_at, submissions!inner(account_id, created_at)')
+        .eq('submissions.account_id', account.id)
+        .gte('end_at', getChallengeDate())
+        .order('title')
+        .order('created_at', {referencedTable: 'submissions', ascending: true})
+        .limit(1, {referencedTable: 'submissions'});
+
+    if (error) throw error;
+    return (data ?? []).map((challenge) => ({
+        id: challenge.id,
+        title: challenge.title,
+        description: challenge.description ?? '',
+        joinedAt: challenge.submissions[0].created_at,
+        endAt: challenge.end_at,
+    }));
 }
 
 

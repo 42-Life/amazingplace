@@ -94,21 +94,34 @@ export type Submission = {
     createdAt: string
 }
 
-export type SubmissionPhoto = Pick<Submission, 'id' | 'imageUrl' | 'createdAt'>;
+export type SubmissionPhoto = Pick<Submission, 'id' | 'imageUrl' | 'createdAt'> & {
+    username: string;
+    isOwn: boolean;
+};
 
-// Everyone's entries for one challenge, newest first.
+// The user's own entries first, then everyone else's; newest first within each group.
 export async function fetchChallengeSubmissions(challengeId: string): Promise<{photos: SubmissionPhoto[]; total: number}> {
+    const account = await fetchMyAccount();
     const {data, error, count} = await supabase
         .from('submissions')
-        .select('id, image_path, created_at', {count: 'exact'})
+        .select('id, image_path, created_at, account_id, accounts(username)', {count: 'exact'})
         .eq('challenge_id', challengeId)
-        .order('created_at', {ascending: false});
+        .order('created_at', {ascending: false})
+        .overrideTypes<{
+            id: string;
+            image_path: string;
+            created_at: string;
+            account_id: string;
+            accounts: {username: string} | null;
+        }[], {merge: false}>();
     if (error) throw error;
     const photos = (data ?? []).map((row) => ({
         id: row.id,
         imageUrl: supabase.storage.from('photos').getPublicUrl(row.image_path).data.publicUrl,
         createdAt: row.created_at,
-    }));
+        username: row.accounts?.username ?? 'unknown',
+        isOwn: row.account_id === account?.id,
+    })).sort((a, b) => Number(b.isOwn) - Number(a.isOwn));
     return {photos, total: count ?? photos.length};
 }
 
