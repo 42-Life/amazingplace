@@ -22,7 +22,10 @@ export const TABS: TabConfig[] = [
     {name: 'account', title: 'Account', icon: 'person-outline', iconFocused: 'person'},         // Account/Settings section
 ]
 
-// One challenge pin: where it is and what people are asked to photograph
+// What a challenge asks people to capture. Set when the challenge is created and can't change after.
+export type MediaType = 'photo' | 'video'
+
+// One challenge pin: where it is and what people are asked to photograph or film
 export type ChallengeLocation = {
     id: string
     title: string
@@ -31,10 +34,11 @@ export type ChallengeLocation = {
     longitude: number
     start_at: string
     end_at: string          // last day of the challenge, YYYY-MM-DD
-    radius_m: number        // photos must be taken within this many meters of the pin
+    radius_m: number        // photos and videos must be taken within this many meters of the pin
+    media_type: MediaType   // whether entries are photos or videos
 }
 
-// Where a photo was taken
+// Where a photo or video was taken
 export type PhotoLocation = {
     latitude: number
     longitude: number

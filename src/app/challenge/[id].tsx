@@ -1,6 +1,6 @@
 // CHALLENGE SCREEN
 // One challenge's title and description. Opened by the "View challenge" button on the map.
-// This is the only place the camera lives: photos taken here go to this challenge only.
+// This is the only place the camera lives: photos (or videos) taken here go to this challenge only.
 
 // KEY IMPORTS
 // Hooks
@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 // React and Expo functions and components
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 // Internal imports
 import ChallengeCamera from '@/components/capture/ChallengeCamera';
@@ -70,6 +70,19 @@ export default function ChallengeScreen() {
 
     }, [id])   // re-runs if the user opens a different challenge
 
+    const isVideoChallenge = challenge?.media_type === 'video';
+
+    // ENTER: opens the camera, locked to this challenge
+    //   TEMPORARY: video recording isn't built yet, so video challenges explain that instead of
+    //   opening the photo camera (whose photos this challenge would reject). Replaced by the video camera.
+    const enterChallenge = () => {
+        if (isVideoChallenge) {
+            Alert.alert('Coming soon', 'Recording videos for challenges is almost ready. Check back soon.');
+            return;
+        }
+        setIsCameraOpen(true);
+    }
+
     // CAMERA: takes over the whole screen, locked to this challenge
     if (isCameraOpen && challenge) {
         return <ChallengeCamera challenge={challenge} onClose={() => setIsCameraOpen(false)} />
@@ -96,6 +109,7 @@ export default function ChallengeScreen() {
                         challengeId={challenge.id}
                         header={(submissionCount) => <View style={styles.details}>
                             <Text style={styles.title}>{challenge.title}</Text>
+                            <Text style={[styles.submissionTag, styles.typeTag]}>{isVideoChallenge ? 'Video challenge' : 'Photo challenge'}</Text>
                             <ChallengeAreaMap
                                 coordinate={{latitude: Number(challenge.latitude), longitude: Number(challenge.longitude)}}
                                 radiusM={Number(challenge.radius_m)}
@@ -103,7 +117,7 @@ export default function ChallengeScreen() {
                             />
                             <Text style={styles.description}>{challenge.description}</Text>
                             <View style={styles.radiusRow}>
-                                <Text style={styles.areaTitle}>Photo radius: {formatRadius(Number(challenge.radius_m))}</Text>
+                                <Text style={styles.areaTitle}>{isVideoChallenge ? 'Video' : 'Photo'} radius: {formatRadius(Number(challenge.radius_m))}</Text>
                                 <Text style={styles.submissionTag} accessibilityLiveRegion="polite">
                                     {submissionCount === null ? 'Submissions: —' : `${submissionCount.toLocaleString()} ${submissionCount === 1 ? 'submission' : 'submissions'}`}
                                 </Text>
@@ -115,11 +129,11 @@ export default function ChallengeScreen() {
                     />
                     <View style={styles.footer}>
                         <Pressable
-                            onPress={() => setIsCameraOpen(true)}
+                            onPress={enterChallenge}
                             accessibilityRole="button"
                             style={({pressed}) => [styles.enterButton, pressed && styles.enterButtonPressed]}
                         >
-                            <Text style={styles.enterButtonText}>Enter Challenge</Text>
+                            <Text style={styles.enterButtonText}>{isVideoChallenge ? 'Record Video' : 'Enter Challenge'}</Text>
                         </Pressable>
                     </View>
                 </>

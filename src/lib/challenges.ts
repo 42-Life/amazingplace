@@ -8,13 +8,17 @@ import { fetchMyAccount } from '@/lib/accounts';
 import { getChallengeDate, isValidChallengeDate } from '@/utils/challenge-dates';
 
 
+// The columns every challenge query asks for, so none of them can forget one (e.g. media_type)
+export const CHALLENGE_FIELDS = 'id, title, description, latitude, longitude, start_at, end_at, radius_m, media_type';
+
+
 // FETCH CHALLENGES
 // Gets the list of challenges from the database (used when picking which challenge to enter)
 export async function fetchChallenges(): Promise<ChallengeLocation[]> {
     // STEP 1: Get challenges that have not ended, sorted by title.
     const {data, error} = await supabase
         .from('challenges')
-        .select('id, title, description, latitude, longitude, start_at, end_at, radius_m')
+        .select(CHALLENGE_FIELDS)
         .gte('end_at', getChallengeDate())
         .order('title');
 
@@ -52,6 +56,7 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
             start_at: challenge.start_at,
             end_at: challenge.end_at,
             radius_m: Number(challenge.radius_m),
+            media_type: challenge.media_type,
         }]
     })
 
@@ -100,7 +105,7 @@ export async function fetchChallengeById(id: string): Promise<ChallengeLocation 
     //   maybeSingle, not single: a missing row comes back as null instead of an error
     const {data, error} = await supabase
         .from('challenges')
-        .select('id, title, description, latitude, longitude, start_at, end_at, radius_m')
+        .select(CHALLENGE_FIELDS)
         .eq('id', id)
         .gte('end_at', getChallengeDate())
         .maybeSingle();
@@ -118,7 +123,6 @@ export async function fetchChallengeById(id: string): Promise<ChallengeLocation 
 // Everything here is required, matching the columns the database won't allow to be null.
 export type NewChallenge = Omit<ChallengeLocation, 'id'>;
 
-const CHALLENGE_FIELDS = 'id, title, description, latitude, longitude, start_at, end_at, radius_m';
 
 // Includes upcoming, active and ended challenges owned by this account.
 export async function fetchCreatedChallenges(): Promise<ChallengeLocation[]> {
@@ -279,6 +283,10 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     if (start_at < today) throw new Error('The start date can\'t be in the past.');
     if (end_at < start_at) throw new Error('The end date can\'t be before the start date.');
 
+    // STEP 2d: Entries are either photos or videos (database: 'photo' or 'video')
+    const {media_type} = challenge;
+    if (media_type !== 'photo' && media_type !== 'video') throw new Error('Choose whether entries are photos or videos.');
+
     // STEP 3: Make sure the user is signed in
     const account = await fetchMyAccount();
     if (!account) throw new Error('Please sign in first.');
@@ -289,8 +297,8 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     // STEP 5: Insert the challenge and ask the database to send the saved row back
     const {data, error} = await supabase
         .from('challenges')
-        .insert({id, title, description, latitude, longitude, radius_m, start_at, end_at, creator_account_id: account.id})
-        .select('id, title, description, latitude, longitude, start_at, end_at, radius_m')
+        .insert({id, title, description, latitude, longitude, radius_m, start_at, end_at, media_type, creator_account_id: account.id})
+        .select(CHALLENGE_FIELDS)
         .single();
 
     // STEP 6: Stop here if saving failed

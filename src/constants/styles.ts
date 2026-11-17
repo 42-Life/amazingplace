@@ -328,6 +328,36 @@ export const createChallengeStyles = StyleSheet.create({
     },
 
 
+    // Step 1: photo or video choice (see src/components/MediaTypePicker.tsx)
+    mediaTypeRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    mediaTypeOption: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        minHeight: 48,
+        borderWidth: 1,
+        borderColor: colors.tabBarBorder,
+        borderRadius: 10,
+    },
+    mediaTypeOptionSelected: {
+        borderWidth: 2,
+        borderColor: colors.active,
+    },
+    mediaTypeText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: colors.text,
+    },
+    mediaTypeTextSelected: {
+        color: colors.active,
+    },
+
+
     // Step 2: map with a pin locked to the centre
     mapWrapper: {
         flex: 1,
@@ -473,6 +503,7 @@ export const challengeDetailStyles = StyleSheet.create({
     details: {gap: 12},
     radiusRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap'},
     submissionTag: {fontSize: 13, fontWeight: '600', color: colors.text, backgroundColor: colors.tabBarBorder, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16},
+    typeTag: {alignSelf: 'flex-start'},
     title: {fontSize: 26, fontWeight: '700', color: colors.text},
     description: {fontSize: 16, color: colors.text},
     area: {gap: 8},

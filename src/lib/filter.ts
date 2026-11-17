@@ -1,5 +1,6 @@
 import type {ChallengeLocation} from '@/constants/types';
 import {supabase} from '@/lib/supabase';
+import {CHALLENGE_FIELDS} from '@/lib/challenges';
 import {getChallengeDate, isValidChallengeDate} from '@/utils/challenge-dates';
 
 export type ChallengeStartDateFilter = {from: string; through: string};
@@ -41,7 +42,7 @@ export async function searchChallengesByName(name: string): Promise<ChallengeLoc
     ].join(',');
     const {data, error} = await supabase
         .from('challenges')
-        .select('id, title, description, latitude, longitude, start_at, end_at, radius_m')
+        .select(CHALLENGE_FIELDS)
         .gte('end_at', getChallengeDate())
         .or(filters)
         .order('title');

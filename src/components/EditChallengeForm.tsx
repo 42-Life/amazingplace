@@ -83,6 +83,10 @@ export default function EditChallengeForm({challenge, onClose}: {challenge: Chal
                         <Text style={formStyles.label}>Description</Text>
                         <TextInput accessibilityLabel="Challenge description" value={description} onChangeText={setDescription} maxLength={500} multiline style={[formStyles.input, formStyles.inputMultiline]} />
 
+                        <Text style={formStyles.label}>Entries</Text>
+                        <Text style={formStyles.reviewValue}>{challenge.media_type === 'video' ? 'Videos (up to 30 seconds)' : 'Photos'}</Text>
+                        <Text style={formStyles.hint}>Whether entries are photos or videos can’t be changed after a challenge is created.</Text>
+
                         <Text style={formStyles.label}>Start date</Text>
                         {canChangeStartAndLocation
                             ? <DateSelector label="Start date" value={startAt} onChange={setStartAt} minimumDate={today} />
