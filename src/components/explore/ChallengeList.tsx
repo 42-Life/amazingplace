@@ -43,7 +43,7 @@ export default function ChallengeList<T extends ChallengeListItem>({challenges, 
     return (
         <FlatList
             style={styles.fill}
-            contentContainerStyle={[styles.content, layout === 'rows' && styles.rowsContent, {paddingTop: (searchQuery.trim() ? 140 : 80) + insets.top}]}   // leaves room for the floating search bar below the status bar
+            contentContainerStyle={[styles.content, layout === 'rows' && styles.rowsContent, {paddingTop: (layout === 'rows' ? 20 : searchQuery.trim() ? 140 : 80) + insets.top}]}   // card layout leaves room for Explore's floating search controls
             data={challenges}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
