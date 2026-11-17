@@ -358,6 +358,10 @@ export const createChallengeStyles = StyleSheet.create({
         fontSize: 13,
         color: colors.inactive,
     },
+    // Same line as the hint, in red, when what was typed can't be used
+    errorHint: {
+        color: '#B91C1C',
+    },
 
 
     // Step 1: photo or video choice (see src/components/MediaTypePicker.tsx)
@@ -516,10 +520,16 @@ export const authStyles = StyleSheet.create({
 
 export const challengeDetailStyles = StyleSheet.create({
     safe: {flex: 1, backgroundColor: colors.background},
-    footer: {paddingHorizontal: 20, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.tabBarBorder},
+    footer: {paddingHorizontal: 20, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.tabBarBorder, gap: 8},
     enterButton: {minHeight: 56, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.active, borderRadius: 12},
     enterButtonPressed: {opacity: 0.8},
+    enterButtonDisabled: {opacity: 0.6},
     enterButtonText: {fontSize: 16, fontWeight: '700', color: colors.buttonIconColor},
+
+    // Entry fee: the tag beside "Photo challenge", and the lines under the button
+    priceTag: {backgroundColor: colors.active, color: colors.buttonIconColor},
+    paymentError: {fontSize: 14, color: '#B91C1C'},
+    paymentNote: {fontSize: 13, color: colors.inactive, textAlign: 'center'},
 
     // Back button row across the top
     header: {
@@ -535,7 +545,9 @@ export const challengeDetailStyles = StyleSheet.create({
     details: {gap: 12},
     radiusRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap'},
     submissionTag: {fontSize: 13, fontWeight: '600', color: colors.text, backgroundColor: colors.tabBarBorder, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16},
-    typeTag: {alignSelf: 'flex-start'},
+    // Holds the "Photo challenge" tag and, on paid challenges, the price beside it.
+    // The row is what keeps the tags from stretching the full width.
+    tagRow: {flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap'},
     title: {fontSize: 26, fontWeight: '700', color: colors.text},
     description: {fontSize: 16, color: colors.text},
     area: {gap: 8},

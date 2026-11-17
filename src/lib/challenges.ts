@@ -6,10 +6,11 @@ import type { ChallengeLocation } from '@/constants/types';
 import { supabase } from '@/lib/supabase';
 import { fetchMyAccount } from '@/lib/accounts';
 import { getChallengeDate, isValidChallengeDate } from '@/utils/challenge-dates';
+import { MAX_PRICE_CENTS, MIN_PRICE_CENTS, formatPrice, isValidPriceCents } from '@/utils/price';
 
 
 // The columns every challenge query asks for, so none of them can forget one (e.g. media_type)
-export const CHALLENGE_FIELDS = 'id, title, description, latitude, longitude, start_at, end_at, radius_m, media_type';
+export const CHALLENGE_FIELDS = 'id, title, description, latitude, longitude, start_at, end_at, radius_m, media_type, price_cents';
 
 
 // FETCH CHALLENGES
@@ -57,6 +58,7 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
             end_at: challenge.end_at,
             radius_m: Number(challenge.radius_m),
             media_type: challenge.media_type,
+            price_cents: Number(challenge.price_cents ?? 0),
         }]
     })
 
@@ -287,6 +289,13 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     const {media_type} = challenge;
     if (media_type !== 'photo' && media_type !== 'video') throw new Error('Choose whether entries are photos or videos.');
 
+    // STEP 2e: The entry fee is free or a real amount (database: 0, or 50 to 100000 cents).
+    //   The same check runs in the database, so a stale app can't slip an odd price through.
+    const {price_cents} = challenge;
+    if (!isValidPriceCents(price_cents)) {
+        throw new Error(`An entry fee must be free, or between ${formatPrice(MIN_PRICE_CENTS)} and ${formatPrice(MAX_PRICE_CENTS)}.`);
+    }
+
     // STEP 3: Make sure the user is signed in
     const account = await fetchMyAccount();
     if (!account) throw new Error('Please sign in first.');
@@ -297,7 +306,7 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     // STEP 5: Insert the challenge and ask the database to send the saved row back
     const {data, error} = await supabase
         .from('challenges')
-        .insert({id, title, description, latitude, longitude, radius_m, start_at, end_at, media_type, creator_account_id: account.id})
+        .insert({id, title, description, latitude, longitude, radius_m, start_at, end_at, media_type, price_cents, creator_account_id: account.id})
         .select(CHALLENGE_FIELDS)
         .single();
 

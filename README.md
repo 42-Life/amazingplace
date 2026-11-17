@@ -88,6 +88,84 @@ Editing rules are checked in `src/lib/challenges.ts` and by a database trigger. 
 
 Run the edit validation tests with `npm test`. The permission checks in `tests/challenge-management.sql` are for a disposable database with the project schema applied; they create test accounts and roll back all changes.
 
+## Paid challenges (Stripe)
+
+A challenge can have an entry fee. Free challenges (`price_cents = 0`) work exactly as before
+and never touch Stripe.
+
+### How it works
+
+1. The creator sets a fee in the New Challenge form. It's stored in `challenges.price_cents`
+   as whole cents, and can't be changed afterwards (a database trigger refuses it).
+2. On a paid challenge, the button on the challenge screen reads "Pay $5.00 to enter".
+   Tapping it calls the `create-entry-payment` edge function, which creates a Stripe
+   PaymentIntent and opens Stripe's payment sheet.
+3. When the payment succeeds, Stripe calls the `stripe-webhook` edge function, which marks
+   that person's row in `challenge_entries` as `paid`. **Only the webhook does this** — the
+   app can't, which is why a user can't grant themselves entry.
+4. The `submissions` insert policy calls `has_challenge_access()`, so an unpaid submission is
+   refused by the database even if someone gets past the app's buttons.
+
+Two rules hold this together, and both are worth keeping:
+
+- **The amount comes from the database, never from the app.** The app sends a challenge id and
+  nothing else, so a tampered request can't buy a $20 challenge for 50¢.
+- **The secret key lives only in the edge functions.** The app holds the publishable key
+  (`pk_`), which can start payments and nothing else. If you ever find an `sk_` or `rk_` key
+  under `src/`, it's in the wrong place — roll it in the Stripe dashboard.
+
+### One-time setup
+
+1. Get test API keys. With no Stripe account, [the Stripe CLI](https://docs.stripe.com/cli)
+   can make a throwaway one:
+
+   ```bash
+   npm i -g @stripe/cli
+   stripe sandbox create     # or `stripe login` for an existing account
+   ```
+
+2. Put the publishable key in `.env.local` next to the Supabase ones:
+
+   ```
+   EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+   ```
+
+   Without it the app still runs; only paid challenges stop, with a message saying so.
+
+3. Give the edge functions the secret key. These are set on the hosted project, not committed:
+
+   ```bash
+   supabase secrets set STRIPE_SECRET_KEY=rk_test_...
+   supabase functions deploy create-entry-payment
+   supabase functions deploy stripe-webhook
+   ```
+
+   Prefer a [restricted key](https://docs.stripe.com/keys#manage-your-api-keys) (`rk_`) with
+   write access to Customers, Customer Sessions and PaymentIntents over a full `sk_` key.
+
+4. Point Stripe at the webhook. In the Stripe dashboard add an endpoint for
+   `https://<project-ref>.supabase.co/functions/v1/stripe-webhook`, subscribed to
+   `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded` and
+   `charge.dispute.closed`. Then store its signing secret:
+
+   ```bash
+   supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_...
+   ```
+
+### Testing
+
+The Stripe SDK has native code, so **Expo Go can't open the payment sheet**. Use a development
+build (`npx expo run:ios`, or `eas build --profile development`).
+
+Forward webhooks to a local function with `stripe listen --forward-to localhost:54321/functions/v1/stripe-webhook`
+(use the `whsec_` it prints, not the dashboard's). Pay with card `4242 4242 4242 4242`, any
+future expiry and any CVC; `4000 0025 0000 3155` forces a 3D Secure prompt and
+`4000 0000 0000 9995` is declined. The full list is in
+[Stripe's testing docs](https://docs.stripe.com/testing).
+
+No real money moves while the keys are test keys. Switch to live keys only when the team
+decides to, and never commit either kind.
+
 ## Get a fresh project
 
 When you're ready, run:

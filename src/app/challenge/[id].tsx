@@ -1,6 +1,10 @@
 // CHALLENGE SCREEN
 // One challenge's title and description. Opened by the "View challenge" button on the map.
 // This is the only place the camera lives: photos (or videos) taken here go to this challenge only.
+//
+// Challenges with an entry fee open Stripe's payment sheet before the camera. Paying is
+// only the first half of the lock: the database refuses the submission itself unless the
+// fee has been confirmed, so a user who skips past this screen still gets nowhere.
 
 // KEY IMPORTS
 // Hooks
@@ -18,7 +22,10 @@ import ChallengeAreaMap, { formatRadius } from '@/components/ChallengeAreaMap';
 import { challengeDetailStyles as styles } from '@/constants/styles';
 import { theme } from '@/constants/theme';
 import type { ChallengeLocation } from '@/constants/types';
+import { useChallengeEntry } from '@/hooks/use-challenge-entry';
 import { fetchChallengeById } from '@/lib/challenges';
+import { isPaidChallenge } from '@/lib/payments';
+import { formatPrice } from '@/utils/price';
 
 
 // MAIN FUNCTION
@@ -72,6 +79,19 @@ export default function ChallengeScreen() {
     }, [id])   // re-runs if the user opens a different challenge
 
     const isVideoChallenge = challenge?.media_type === 'video';
+    const isPaid = challenge ? isPaidChallenge(challenge) : false;
+
+    // Whether this user may submit yet, and how to let them pay if not
+    const entry = useChallengeEntry(challenge);
+
+    // WHAT THE BUTTON DOES
+    //   Already in: straight to the camera.
+    //   Not yet: pay first, and only open the camera if that worked.
+    const openCamera = () => setIsCameraOpen(true);
+    const payThenOpenCamera = async () => {
+        const paid = await entry.pay();
+        if (paid) openCamera();
+    };
 
     // CAMERA: takes over the whole screen, locked to this challenge
     //   Video challenges get the video camera, photo challenges the photo camera
@@ -103,7 +123,14 @@ export default function ChallengeScreen() {
                         challengeId={challenge.id}
                         header={(submissionCount) => <View style={styles.details}>
                             <Text style={styles.title}>{challenge.title}</Text>
-                            <Text style={[styles.submissionTag, styles.typeTag]}>{isVideoChallenge ? 'Video challenge' : 'Photo challenge'}</Text>
+                            <View style={styles.tagRow}>
+                                <Text style={styles.submissionTag}>{isVideoChallenge ? 'Video challenge' : 'Photo challenge'}</Text>
+                                {isPaid && (
+                                    <Text style={[styles.submissionTag, styles.priceTag]}>
+                                        {formatPrice(challenge.price_cents)} to enter
+                                    </Text>
+                                )}
+                            </View>
                             <ChallengeAreaMap
                                 coordinate={{latitude: Number(challenge.latitude), longitude: Number(challenge.longitude)}}
                                 radiusM={Number(challenge.radius_m)}
@@ -122,13 +149,33 @@ export default function ChallengeScreen() {
                         </View>}
                     />
                     <View style={styles.footer}>
+                        {entry.errorMessage && (
+                            <Text style={styles.paymentError} accessibilityLiveRegion="polite">{entry.errorMessage}</Text>
+                        )}
                         <Pressable
-                            onPress={() => setIsCameraOpen(true)}
+                            onPress={entry.hasAccess ? openCamera : payThenOpenCamera}
+                            disabled={entry.isChecking || entry.isPaying}
                             accessibilityRole="button"
-                            style={({pressed}) => [styles.enterButton, pressed && styles.enterButtonPressed]}
+                            style={({pressed}) => [
+                                styles.enterButton,
+                                pressed && styles.enterButtonPressed,
+                                (entry.isChecking || entry.isPaying) && styles.enterButtonDisabled,
+                            ]}
                         >
-                            <Text style={styles.enterButtonText}>{isVideoChallenge ? 'Record Video' : 'Enter Challenge'}</Text>
+                            {entry.isChecking || entry.isPaying ? (
+                                <ActivityIndicator color={colors.buttonIconColor} />
+                            ) : (
+                                <Text style={styles.enterButtonText}>
+                                    {entry.hasAccess
+                                        ? (isVideoChallenge ? 'Record Video' : 'Enter Challenge')
+                                        : `Pay ${formatPrice(challenge.price_cents)} to enter`}
+                                </Text>
+                            )}
                         </Pressable>
+                        {/* Reassure repeat visitors that they aren't about to be charged twice */}
+                        {isPaid && entry.hasAccess && !entry.isChecking && (
+                            <Text style={styles.paymentNote}>Entry fee paid.</Text>
+                        )}
                     </View>
                 </>
             )}

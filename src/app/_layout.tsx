@@ -7,7 +7,9 @@ import {useEffect, useState} from "react";
 import {StatusBar} from "expo-status-bar";
 import {Stack} from "expo-router";
 import type {Session} from "@supabase/supabase-js";
+import {StripeProvider} from "@stripe/stripe-react-native";
 import {supabase} from "@/lib/supabase";
+import {STRIPE_PUBLISHABLE_KEY, STRIPE_URL_SCHEME} from "@/lib/stripe";
 import AuthForm from "@/components/AuthForm";
 
 // MAIN FUNCTION
@@ -27,12 +29,15 @@ export default function RootLayout() {
 
     // RENDER: status bar plus either the sign-in form or the screen stack
     //   (no top header, the tabs handle navigation)
+    //   StripeProvider wraps everything so any screen can open the payment sheet.
+    //   urlScheme is how a bank's 3D Secure page gets back to the app afterwards.
+    //   With no key set the provider is harmless; paid challenges explain themselves instead.
     return(
-        <>
+        <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} urlScheme={STRIPE_URL_SCHEME}>
             <StatusBar style={"auto"}></StatusBar>
             {session
                 ? <Stack screenOptions={{headerShown: false}}></Stack>
                 : <AuthForm />}
-        </>
+        </StripeProvider>
     )
 }

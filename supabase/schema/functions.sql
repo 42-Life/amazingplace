@@ -34,12 +34,15 @@ language plpgsql
 set search_path to 'public'
 as $$
 begin
+    -- The entry fee is fixed at creation, like the radius and media type. Letting a creator
+    -- raise it afterwards would change the deal for everyone who already paid to get in.
     if new.id is distinct from old.id
        or new.created_at is distinct from old.created_at
        or new.radius_m is distinct from old.radius_m
        or new.media_type is distinct from old.media_type
+       or new.price_cents is distinct from old.price_cents
        or (old.creator_account_id is not null and new.creator_account_id is distinct from old.creator_account_id) then
-        raise exception 'Challenge identity, creator, radius and media type cannot be changed.';
+        raise exception 'Challenge identity, creator, radius, media type and entry fee cannot be changed.';
     end if;
 
     if new.title is distinct from old.title and char_length(trim(new.title)) not between 1 and 80 then
@@ -77,6 +80,38 @@ begin
     return new;
 end;
 $$;
+
+-- May this account submit to this challenge?
+-- True for a free challenge, for the creator of the challenge, and for anyone whose
+-- entry fee has been confirmed paid by Stripe. Used by the submissions insert policy,
+-- so the fee is enforced by the database and not only by the app's buttons.
+--
+-- security definer: the caller may not be allowed to read challenge_entries rows that
+-- aren't theirs, but this function has to read them to answer the question.
+create or replace function public.has_challenge_access(p_challenge_id text, p_account_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path to 'public'
+as $$
+    select p_account_id is not null and exists (
+        select 1 from public.challenges c
+        where c.id = p_challenge_id
+          and (
+              c.price_cents = 0
+              or c.creator_account_id = p_account_id
+              or exists (
+                  select 1 from public.challenge_entries e
+                  where e.challenge_id = c.id
+                    and e.account_id = p_account_id
+                    and e.status = 'paid'
+              )
+          )
+    )
+$$;
+
+grant execute on function public.has_challenge_access(text, uuid) to authenticated, service_role;
 
 -- A submission must match its challenge's media type (no photos in a video challenge, and vice versa).
 create or replace function public.validate_submission_media_type()
