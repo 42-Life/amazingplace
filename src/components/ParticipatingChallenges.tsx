@@ -5,24 +5,6 @@ import {Text, View} from 'react-native';
 import {challengeListStyles as styles} from '@/constants/styles';
 import {fetchParticipatingChallenges, type ParticipatingChallenge} from '@/lib/challenges';
 
-// Temporary local entries for testing the participating list layout.
-const TEST_CHALLENGES: ParticipatingChallenge[] = [
-    {
-        id: 'test-charles-river',
-        title: 'Charles River Views',
-        description: 'Capture your favorite view of the Charles River.',
-        joinedAt: '2026-11-17T15:30:00Z',
-        endAt: '2099-12-31',
-    },
-    {
-        id: 'test-campus-details',
-        title: 'Hidden Campus Details',
-        description: 'Find a small detail around campus that most people walk past every day. Look for interesting patterns, unusual architecture, colorful murals, or unexpected reflections, and photograph it from a fresh angle to show everyone something they may never have noticed before.',
-        joinedAt: '2026-11-16T19:15:00Z',
-        endAt: '2099-12-31',
-    },
-];
-
 export default function ParticipatingChallenges() {
     const [revision, setRevision] = useState(0);
 
@@ -30,7 +12,7 @@ export default function ParticipatingChallenges() {
 }
 
 function ParticipatingChallengeList({onRetry}: {onRetry: () => void}) {
-    const [challenges, setChallenges] = useState<ParticipatingChallenge[]>([...TEST_CHALLENGES]);
+    const [challenges, setChallenges] = useState<ParticipatingChallenge[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -41,8 +23,7 @@ function ParticipatingChallengeList({onRetry}: {onRetry: () => void}) {
         setErrorMessage(null);
 
         fetchParticipatingChallenges()
-            // Rebuild from the test entries on refresh so fetched entries don't accumulate duplicates.
-            .then((result) => {if (active) setChallenges([...TEST_CHALLENGES, ...result]);})
+            .then((result) => {if (active) setChallenges(result);})
             .catch((error) => {
                 console.error('Could not load participating challenges:', error);
                 if (active) setErrorMessage('Could not load your challenges. Please try again.');
