@@ -4,7 +4,7 @@ import {useState} from 'react';
 import {Keyboard, Pressable, View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import CreateChallengeForm from '@/components/CreateChallengeForm';
+import ChallengeDashboard from '@/components/ChallengeDashboard';
 import ParticipatingChallenges from '@/components/ParticipatingChallenges';
 import {challengeListStyles as styles} from '@/constants/styles';
 import {theme} from '@/constants/theme';
@@ -15,7 +15,7 @@ export default function ChallengesScreen() {
 
     return (
         <View style={styles.fill}>
-            {viewMode === 'managing' ? <CreateChallengeForm /> : <ParticipatingChallenges />}
+            {viewMode === 'managing' ? <ChallengeDashboard /> : <ParticipatingChallenges />}
             <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={viewMode === 'participating' ? 'Switch to managing challenges' : 'Switch to participating challenges'}

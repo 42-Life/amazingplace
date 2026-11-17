@@ -118,6 +118,107 @@ export async function fetchChallengeById(id: string): Promise<ChallengeLocation 
 // Everything here is required, matching the columns the database won't allow to be null.
 export type NewChallenge = Omit<ChallengeLocation, 'id'>;
 
+const CHALLENGE_FIELDS = 'id, title, description, latitude, longitude, start_at, end_at, radius_m';
+
+// Includes upcoming, active and ended challenges owned by this account.
+export async function fetchCreatedChallenges(): Promise<ChallengeLocation[]> {
+    const account = await fetchMyAccount();
+    if (!account) return [];
+    const {data, error} = await supabase.from('challenges')
+        .select(CHALLENGE_FIELDS)
+        .eq('creator_account_id', account.id)
+        .order('created_at', {ascending: false});
+    if (error) throw error;
+    return (data ?? []) as ChallengeLocation[];
+}
+
+export async function fetchCreatedChallengeById(id: string): Promise<ChallengeLocation> {
+    const account = await fetchMyAccount();
+    if (!account) throw new Error('Please sign in first.');
+    const {data, error} = await supabase.from('challenges')
+        .select(CHALLENGE_FIELDS)
+        .eq('id', id)
+        .eq('creator_account_id', account.id)
+        .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('This challenge no longer exists or does not belong to you.');
+    return data as ChallengeLocation;
+}
+
+export type ChallengeEdits = Partial<Pick<ChallengeLocation,
+    'title' | 'description' | 'start_at' | 'end_at' | 'latitude' | 'longitude'>>;
+
+// Validate against the latest saved challenge, rather than a potentially stale form.
+export function validateChallengeEdits(current: ChallengeLocation, edits: ChallengeEdits, today = getChallengeDate()): ChallengeEdits {
+    const changes: ChallengeEdits = {};
+    if (edits.title !== undefined && edits.title.trim() !== current.title) {
+        const title = edits.title.trim();
+        if (!title || title.length > 80) throw new Error('Title must be 1 to 80 characters.');
+        changes.title = title;
+    }
+    if (edits.description !== undefined && edits.description.trim() !== (current.description ?? '')) {
+        const description = edits.description.trim();
+        if (!description || description.length > 500) throw new Error('Description must be 1 to 500 characters.');
+        changes.description = description;
+    }
+    if (edits.end_at !== undefined && edits.end_at !== current.end_at) {
+        if (!isValidChallengeDate(edits.end_at) || edits.end_at <= today) throw new Error('The end date must be after today.');
+        changes.end_at = edits.end_at;
+    }
+    const hasBegun = current.start_at <= today;
+    if (edits.start_at !== undefined && edits.start_at !== current.start_at) {
+        if (hasBegun) throw new Error('The start date cannot change after the challenge has begun.');
+        if (!isValidChallengeDate(edits.start_at) || edits.start_at < today) throw new Error('The start date cannot be in the past.');
+        changes.start_at = edits.start_at;
+    }
+    if ((changes.start_at !== undefined || changes.end_at !== undefined)
+        && (changes.end_at ?? current.end_at) < (changes.start_at ?? current.start_at)) {
+        throw new Error('The end date cannot be before the start date.');
+    }
+    const latitude = edits.latitude ?? current.latitude;
+    const longitude = edits.longitude ?? current.longitude;
+    if (latitude !== current.latitude || longitude !== current.longitude) {
+        if (hasBegun) throw new Error('The location cannot change after the challenge has begun.');
+        if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90
+            || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+            throw new Error('Choose valid latitude and longitude coordinates.');
+        }
+        changes.latitude = latitude;
+        changes.longitude = longitude;
+    }
+    return changes;
+}
+
+export async function updateChallenge(id: string, edits: ChallengeEdits): Promise<ChallengeLocation> {
+    const current = await fetchCreatedChallengeById(id);
+    const changes = validateChallengeEdits(current, edits);
+    if (Object.keys(changes).length === 0) return current;
+    const account = await fetchMyAccount();
+    if (!account) throw new Error('Please sign in first.');
+    const {data, error} = await supabase.from('challenges')
+        .update(changes)
+        .eq('id', id)
+        .eq('creator_account_id', account.id)
+        .select(CHALLENGE_FIELDS)
+        .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('This challenge no longer exists or does not belong to you.');
+    return data as ChallengeLocation;
+}
+
+export async function deleteChallenge(id: string): Promise<void> {
+    const account = await fetchMyAccount();
+    if (!account) throw new Error('Please sign in first.');
+    const {data, error} = await supabase.from('challenges')
+        .delete()
+        .eq('id', id)
+        .eq('creator_account_id', account.id)
+        .select('id')
+        .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('This challenge no longer exists or does not belong to you.');
+}
+
 
 // GENERATE CHALLENGE ID
 // Turns a title into a readable id (e.g. "BU CAS Photo Challenge" becomes "bu-cas-photo-challenge").
@@ -179,8 +280,8 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     if (end_at < start_at) throw new Error('The end date can\'t be before the start date.');
 
     // STEP 3: Make sure the user is signed in
-    const {data: {session}} = await supabase.auth.getSession();
-    if (!session?.user) throw new Error('Please sign in first.');
+    const account = await fetchMyAccount();
+    if (!account) throw new Error('Please sign in first.');
 
     // STEP 4: Make an id that no other challenge is using
     const id = await generateChallengeId(title);
@@ -188,7 +289,7 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     // STEP 5: Insert the challenge and ask the database to send the saved row back
     const {data, error} = await supabase
         .from('challenges')
-        .insert({id, title, description, latitude, longitude, radius_m, start_at, end_at})
+        .insert({id, title, description, latitude, longitude, radius_m, start_at, end_at, creator_account_id: account.id})
         .select('id, title, description, latitude, longitude, start_at, end_at, radius_m')
         .single();
 
