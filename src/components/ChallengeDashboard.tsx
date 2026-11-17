@@ -38,7 +38,7 @@ function DashboardList({onRetry}: {onRetry: () => void}) {
     return (
         <FlatList
             style={listStyles.fill}
-            contentContainerStyle={[styles.content, {paddingTop: insets.top + 80}]}
+            contentContainerStyle={[styles.content, {paddingTop: insets.top + 20}]}
             data={challenges}
             keyExtractor={(challenge) => challenge.id}
             ItemSeparatorComponent={() => <View style={listStyles.separator} />}
