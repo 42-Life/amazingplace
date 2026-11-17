@@ -37,8 +37,9 @@ begin
     if new.id is distinct from old.id
        or new.created_at is distinct from old.created_at
        or new.radius_m is distinct from old.radius_m
+       or new.media_type is distinct from old.media_type
        or (old.creator_account_id is not null and new.creator_account_id is distinct from old.creator_account_id) then
-        raise exception 'Challenge identity, creator and radius cannot be changed.';
+        raise exception 'Challenge identity, creator, radius and media type cannot be changed.';
     end if;
 
     if new.title is distinct from old.title and char_length(trim(new.title)) not between 1 and 80 then
@@ -72,6 +73,23 @@ begin
         if not (new.latitude between -90 and 90 and new.longitude between -180 and 180) then
             raise exception 'Choose valid latitude and longitude coordinates.';
         end if;
+    end if;
+    return new;
+end;
+$$;
+
+-- A submission must match its challenge's media type (no photos in a video challenge, and vice versa).
+create or replace function public.validate_submission_media_type()
+returns trigger
+language plpgsql
+set search_path to 'public'
+as $$
+declare
+    challenge_media_type text;
+begin
+    select media_type into challenge_media_type from public.challenges where id = new.challenge_id;
+    if challenge_media_type is not null and new.media_type is distinct from challenge_media_type then
+        raise exception 'This challenge only accepts % submissions.', challenge_media_type;
     end if;
     return new;
 end;
