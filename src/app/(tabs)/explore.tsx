@@ -10,13 +10,13 @@ import * as Location from 'expo-location';
 import { LocationAccuracy } from 'expo-location';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import MapView, { type LatLng, type LongPressEvent, Marker, type Region } from 'react-native-maps';
+import MapView, { Marker, type LatLng, type LongPressEvent, type Region } from 'react-native-maps';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Internal Imports
-import ChallengeList from '@/components/explore/ChallengeList';
-import ChallengeFilterModal from '@/components/explore/ChallengeFilterModal';
 import CreateChallengeForm from '@/components/CreateChallengeForm';
+import ChallengeFilterModal from '@/components/explore/ChallengeFilterModal';
+import ChallengeList from '@/components/explore/ChallengeList';
 import { challengeMapMarkersStyles, challengeListStyles as styles } from "@/constants/styles";
 import { theme } from "@/constants/theme";
 import { ChallengeLocation } from "@/constants/types";
@@ -238,6 +238,16 @@ export default function ExploreScreen() {
 
     }, [reloadCount, searchQuery, focusChallenge]);
 
+    const refreshChallenges = () => {
+        Keyboard.dismiss();
+        defaultChallenges.current = null;
+        searchVersion.current += 1;
+        setSelectedLocation(null);
+        setErrorMessage(null);
+        setIsLoading(true);
+        setReloadCount((count) => count + 1);
+    };
+
     const submitSearch = (text: string) => {
         searchVersion.current += 1;
         Keyboard.dismiss();
@@ -358,7 +368,7 @@ export default function ExploreScreen() {
                         searchQuery={searchQuery}
                         isLoading={isLoading}
                         errorMessage={errorMessage}
-                        onRetry={() => {setIsLoading(true); setReloadCount((count) => count + 1);}}
+                        onRetry={refreshChallenges}
                     />
                 )}
                 {viewMode === 'map' && <View style={styles.fill}>
@@ -397,8 +407,8 @@ export default function ExploreScreen() {
                     <Ionicons name="search-outline" size={22} color={colors.inactive} />
                     <TextInput
                         style={styles.searchInput}
-                        accessibilityLabel="Search challenges"
-                        placeholder="Search challenges"
+                        accessibilityLabel="Search"
+                        placeholder="Search"
                         placeholderTextColor={colors.inactive}
                         value={searchDraft}
                         onChangeText={setSearchDraft}
@@ -427,6 +437,18 @@ export default function ExploreScreen() {
                     style={({pressed}) => [styles.toggleButton, {top: insets.top + 16}, styles.filterButton, hasDateFilter && styles.filterActive, pressed && styles.pressed]}
                 >
                     <Ionicons name={hasDateFilter ? 'funnel' : 'funnel-outline'} size={24} color={hasDateFilter ? colors.background : colors.text} />
+                </Pressable>
+                <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Refresh challenges"
+                    accessibilityState={{disabled: isLoading, busy: isLoading}}
+                    disabled={isLoading}
+                    onPress={refreshChallenges}
+                    style={({pressed}) => [styles.toggleButton, styles.refreshButton, {top: insets.top + 16}, pressed && styles.pressed]}
+                >
+                    {isLoading
+                        ? <ActivityIndicator color={colors.text} accessibilityLabel="Refreshing challenges" />
+                        : <Ionicons name="refresh-outline" size={24} color={colors.text} />}
                 </Pressable>
                 <Pressable
                     accessibilityRole="button"

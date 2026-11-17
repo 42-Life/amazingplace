@@ -21,7 +21,7 @@ const {colors} = theme;
 export const challengeListStyles = StyleSheet.create({
     fill: {flex: 1, backgroundColor: colors.background},
     searchBar: {
-        position: 'absolute', top: 16, left: 16, right: 136, zIndex: 1,
+        position: 'absolute', top: 16, left: 16, right: 196, zIndex: 1,
         height: 48, borderRadius: 24, paddingLeft: 14, paddingRight: 4,
         flexDirection: 'row', alignItems: 'center', gap: 8,
         backgroundColor: colors.background,
@@ -40,7 +40,8 @@ export const challengeListStyles = StyleSheet.create({
         shadowColor: '#000000', shadowOffset: {width: 0, height: 2},
         shadowOpacity: 0.15, shadowRadius: 4, elevation: 4,
     },
-    filterButton: {right: 76},
+    filterButton: {right: 136},
+    refreshButton: {right: 76},
     filterActive: {backgroundColor: colors.text, borderColor: colors.text},
     clearResultsRow: {
         position: 'absolute', top: 80, left: 16, right: 16, zIndex: 1,
@@ -65,8 +66,14 @@ export const challengeListStyles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', gap: 12,
     },
     cardBody: {flex: 1, gap: 6},
+    rowsContent: {gap: 0},
+    row: {paddingVertical: 16, flexDirection: 'row'},
+    separator: {height: StyleSheet.hairlineWidth, backgroundColor: colors.inactive},
     title: {fontSize: 18, fontWeight: '700', color: colors.text},
     description: {fontSize: 15, lineHeight: 22, color: colors.inactive},
+    rowDescription: {minHeight: 44}, // Reserve two lines, including for short descriptions.
+    participationTags: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4},
+    participationTag: {fontSize: 12, lineHeight: 18, color: colors.inactive, backgroundColor: '#F3F4F6', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6},
     pressed: {opacity: 0.6},
 });
 

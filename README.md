@@ -80,6 +80,14 @@ The flow is: edit `schema/` → the CLI writes a migration → you push the migr
 - **Changing data** (insert/update/delete rows) doesn't belong in `schema/`. Run `supabase migration new <name>`, write the SQL in the new file, and push it. Or directly change the data in the Supabase console.
 - **CLI v3 uses a local database by default.** Add `--remote` to `db push` and `db pull` to target the hosted project.
 
+## Challenge management
+
+The Managing view lists challenges owned by the signed-in account. New challenges record `creator_account_id`; challenges created before this field was added have no recorded owner and need an explicit owner assignment in the database before they appear here. Do not infer ownership from photo submissions.
+
+Editing rules are checked in `src/lib/challenges.ts` and by a database trigger. The database uses its current calendar date when enforcing start and end date restrictions.
+
+Run the edit validation tests with `npm test`. The permission checks in `tests/challenge-management.sql` are for a disposable database with the project schema applied; they create test accounts and roll back all changes.
+
 ## Get a fresh project
 
 When you're ready, run:
