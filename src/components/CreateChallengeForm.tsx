@@ -16,6 +16,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {theme} from '@/constants/theme';
 import {createChallengeStyles as styles} from '@/constants/styles';
 import {createChallenge} from '@/lib/challenges';
+import {MAX_PRICE_CENTS, MIN_PRICE_CENTS, formatPrice, parsePrice} from '@/utils/price';
 import DateSelector from '@/components/explore/DateSelector';
 import ChallengeAreaMap, {formatRadius} from '@/components/ChallengeAreaMap';
 import MediaTypePicker from '@/components/MediaTypePicker';
@@ -62,14 +63,25 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [mediaType, setMediaType] = useState<MediaType>('photo');  // whether entries are photos or videos
+    const [priceText, setPriceText] = useState('');                  // entry fee as typed, in dollars ('' = free)
     const [coordinate, setCoordinate] = useState(startCoordinate);   // the spot under the pin
     const [radiusM, setRadiusM] = useState(DEFAULT_RADIUS_M);        // entries must be taken within this many meters of the pin
     const [startAt, setStartAt] = useState(getChallengeDate());      // first day of the challenge, YYYY-MM-DD (starts as today)
     const [endAt, setEndAt] = useState('');                         // last day of the challenge, YYYY-MM-DD ('' = not picked yet)
     const [isSubmitting, setIsSubmitting] = useState(false);         // true while saving; blocks double submits
 
-    // Step 1 is only done once both fields have text and both dates are picked
-    const isDetailsValid = title.trim().length > 0 && description.trim().length > 0 && startAt !== '' && endAt !== '';
+    // ENTRY FEE
+    //   Blank means free. Anything else has to be a real amount Stripe will accept,
+    //   so a half-typed "0." can't become a challenge nobody can pay for.
+    //   priceError is null while the field is fine, and the reason when it isn't.
+    const priceCents = priceText.trim() === '' ? 0 : parsePrice(priceText);
+    const priceError = priceCents === null ? 'Enter an amount like 5 or 5.50.'
+        : priceCents > 0 && priceCents < MIN_PRICE_CENTS ? `A paid challenge must cost at least ${formatPrice(MIN_PRICE_CENTS)}.`
+        : priceCents > MAX_PRICE_CENTS ? `A challenge can't cost more than ${formatPrice(MAX_PRICE_CENTS)}.`
+        : null;
+
+    // Step 1 is only done once both fields have text, both dates are picked, and the fee is usable
+    const isDetailsValid = title.trim().length > 0 && description.trim().length > 0 && startAt !== '' && endAt !== '' && priceError === null;
 
     // Changing the start date clears an end date that would now come before it
     const changeStartAt = (value: string) => {
@@ -88,6 +100,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
         setTitle('');
         setDescription('');
         setMediaType('photo');
+        setPriceText('');
         setCoordinate(startCoordinate);
         setRadiusM(DEFAULT_RADIUS_M);
         setStartAt(getChallengeDate());
@@ -106,7 +119,8 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
         setIsSubmitting(true);
         try {
             // STEP 1: Save the challenge
-            const created = await createChallenge({title, description, ...coordinate, radius_m: radiusM, start_at: startAt, end_at: endAt, media_type: mediaType});
+            //   priceCents is null only while the field is mid-edit, which isDetailsValid blocks
+            const created = await createChallenge({title, description, ...coordinate, radius_m: radiusM, start_at: startAt, end_at: endAt, media_type: mediaType, price_cents: priceCents ?? 0});
 
             // STEP 2: Confirm success
             Alert.alert('Challenge created', `"${created.title}" is now live on the map.`);
@@ -152,6 +166,22 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
                         maxLength={500}
                     />
                     <Text style={styles.hint}>{description.length}/500</Text>
+
+                    <Text style={styles.label}>Entry fee</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={priceText}
+                        onChangeText={setPriceText}
+                        placeholder="Free"
+                        placeholderTextColor={colors.inactive}
+                        keyboardType="decimal-pad"
+                        maxLength={9}
+                    />
+                    <Text style={[styles.hint, priceError ? styles.errorHint : null]}>
+                        {priceError ?? (priceCents
+                            ? `People pay ${formatPrice(priceCents)} once to enter. This can’t be changed later.`
+                            : 'Leave this blank to let anyone enter for free.')}
+                    </Text>
 
                     <Text style={styles.label}>Start date</Text>
                     <DateSelector
@@ -218,6 +248,9 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
 
                 <Text style={styles.label}>Description</Text>
                 <Text style={styles.reviewValue}>{description.trim()}</Text>
+
+                <Text style={styles.label}>Entry fee</Text>
+                <Text style={styles.reviewValue}>{priceCents ? formatPrice(priceCents) : 'Free'}</Text>
 
                 <Text style={styles.label}>Latitude</Text>
                 <Text style={styles.reviewValue}>{coordinate.latitude.toFixed(6)}</Text>

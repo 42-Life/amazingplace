@@ -289,6 +289,11 @@ enabled = false
 # Obtain from https://clerk.com/setup/supabase
 # domain = "example.clerk.accounts.dev"
 
+# Stripe calls this endpoint directly and has no Supabase login, so the usual token check
+# has to be off. The function verifies Stripe's own signature instead — see its comments.
+[functions.stripe-webhook]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Configure one of the supported request policies: `oneshot`, `per_worker`.

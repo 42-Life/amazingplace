@@ -10,12 +10,18 @@ create table public.challenges (
     radius_m double precision not null default 100,
     creator_account_id uuid default public.current_account_id(),
     media_type text not null default 'photo',
+    price_cents integer not null default 0,
 
     constraint challenges_pkey primary key (id),
     constraint challenges_creator_account_id_fkey foreign key (creator_account_id)
         references public.accounts (id) on delete cascade,
     constraint challenges_radius_m_check check (radius_m > 0),
-    constraint challenges_media_type_check check (media_type in ('photo', 'video'))
+    constraint challenges_media_type_check check (media_type in ('photo', 'video')),
+    -- A challenge is either free (0) or costs between 0.50 and 1,000.00 USD.
+    -- The floor is Stripe's minimum charge for USD; anything under it is rejected by the API.
+    constraint challenges_price_cents_check check (
+        price_cents = 0 or price_cents between 50 and 100000
+    )
 );
 
 alter table public.challenges enable row level security;

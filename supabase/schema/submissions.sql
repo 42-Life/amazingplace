@@ -31,10 +31,15 @@ create policy "Signed-in users can view submissions"
     to authenticated
     using (true);
 
+-- Paid challenges only accept submissions from people who paid (and from the creator).
+-- Free challenges are unaffected: has_challenge_access returns true for them.
 create policy "users insert their own submissions"
     on public.submissions for insert
     to authenticated
-    with check (account_id = public.current_account_id());
+    with check (
+        account_id = public.current_account_id()
+        and public.has_challenge_access(challenge_id, public.current_account_id())
+    );
 
 create policy "users delete their own submissions"
     on public.submissions for delete
