@@ -38,3 +38,32 @@ test('video durations match the database limit (1 ms to 31 s)', () => {
 test('size limit matches the videos bucket (50 MiB)', () => {
     assert.equal(MAX_VIDEO_BYTES, 52428800);
 });
+
+const {getRecordedDurationMs, formatDuration, MAX_RECORDING_BYTES} = require('../src/utils/media.ts');
+
+test('recorded length prefers the recorder progress over elapsed time', () => {
+    assert.equal(getRecordedDurationMs(12.4, 13_100), 12_400);
+});
+
+test('recorded length falls back to elapsed time when no progress arrived', () => {
+    assert.equal(getRecordedDurationMs(0, 2_345.6), 2_346);
+});
+
+test('recorded length stays between 1 ms and 30 s', () => {
+    assert.equal(getRecordedDurationMs(30.4, 31_000), 30_000);
+    assert.equal(getRecordedDurationMs(0, 0), 1);
+    assert.equal(getRecordedDurationMs(Number.NaN, Number.NaN), 1);
+});
+
+test('recording size cap leaves room under the bucket limit', () => {
+    assert.ok(MAX_RECORDING_BYTES < MAX_VIDEO_BYTES);
+});
+
+test('durations show as m:ss', () => {
+    assert.equal(formatDuration(0), '0:00');
+    assert.equal(formatDuration(7.9), '0:07');
+    assert.equal(formatDuration(30), '0:30');
+    assert.equal(formatDuration(75), '1:15');
+    assert.equal(formatDuration(-3), '0:00');
+    assert.equal(formatDuration(Number.NaN), '0:00');
+});

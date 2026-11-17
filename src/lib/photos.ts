@@ -20,15 +20,21 @@ const getMediaUrl = (mediaType: MediaType, path: string) =>
 
 // WHAT'S BEING SUBMITTED
 // A photo, or a video with its length (the database needs the length to accept a video)
+// and where recording stopped (a video must start AND end inside the challenge's circle)
 export type Capture =
     | {mediaType: 'photo'; uri: string}
-    | {mediaType: 'video'; uri: string; durationMs: number};
+    | {mediaType: 'video'; uri: string; durationMs: number; endLocation: PhotoLocation | null};
 
+
+// SUBMISSION ERROR
+// Thrown when a photo or video can't be entered (wrong kind for the challenge, too long, too large).
+// Its message is written for users, so the app can show it as is.
+export class SubmissionError extends Error {}
 
 // CAPTURE LOCATION ERROR
 // Thrown when a photo or video can't be entered because of where it was taken (or because we don't know where).
 // Its message is written for users, so the app can show it as is.
-export class CaptureLocationError extends Error {}
+export class CaptureLocationError extends SubmissionError {}
 
 
 // CHECK CAPTURE LOCATION
@@ -53,7 +59,7 @@ export function checkCaptureLocation(
 
 // UPLOAD A SUBMISSION TO A CHALLENGE
 // Takes a photo or video stored on the phone, checks it was taken inside the challenge's circle,
-// uploads it, and records it as a submission (with where it was taken).
+// uploads it, and records it as a submission (with where it was taken; for videos, where recording started).
 // Returns the file's public web link.
 export async function uploadSubmission(
     capture: Capture,
@@ -66,11 +72,14 @@ export async function uploadSubmission(
     // STEP 0: Stop before uploading anything if the challenge wants the other kind of entry,
     //   or if it was taken outside the challenge area. The database checks the type too.
     if (mediaType !== challenge.media_type) {
-        throw new Error(`This challenge only accepts ${challenge.media_type}s.`);
+        throw new SubmissionError(`This challenge only accepts ${challenge.media_type}s.`);
     }
+    //   For videos, `location` is where recording started, and the end is checked too,
+    //   so nobody can start inside the circle and walk out of it while filming
     checkCaptureLocation(challenge, location, mediaType);
-    if (capture.mediaType === 'video' && !isValidVideoDuration(capture.durationMs)) {
-        throw new Error('Videos must be between 1 and 30 seconds long.');
+    if (capture.mediaType === 'video') {
+        checkCaptureLocation(challenge, capture.endLocation, 'video');
+        if (!isValidVideoDuration(capture.durationMs)) throw new SubmissionError('Videos must be between 1 and 30 seconds long.');
     }
 
     // STEP 1: Get the signed-in user (the app only shows its screens to signed-in users)
@@ -93,7 +102,7 @@ export async function uploadSubmission(
     //   Videos are capped at 30 s, which keeps them small enough to hold in memory
     const fileBytes = await fetch(uri).then((response) => response.arrayBuffer());
     if (mediaType === 'video' && fileBytes.byteLength > MAX_VIDEO_BYTES) {
-        throw new Error('This video is too large to upload. Try recording a shorter one.');
+        throw new SubmissionError('This video is too large to upload. Try recording a shorter one.');
     }
 
     // STEP 4: Upload the bytes to the matching storage bucket
