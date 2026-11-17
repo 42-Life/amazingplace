@@ -18,7 +18,8 @@ type TabConfig =  {
 // If adding or removing a main section for the app, use this
 export const TABS: TabConfig[] = [
     {name: 'explore', title: 'Explore', icon: 'map-outline', iconFocused: 'map'},               // Map/Explore section
-    {name: 'challenges', title: 'Challenges', icon: 'trophy-outline', iconFocused: 'trophy'},   // Challenge List & Leaderboard section
+    {name: 'joined', title: 'Joined', icon: 'trophy-outline', iconFocused: 'trophy'},           // Challenges the user has entered
+    {name: 'challenges', title: 'Create', icon: 'add-circle-outline', iconFocused: 'add-circle'}, // Create and manage challenges
     {name: 'account', title: 'Account', icon: 'person-outline', iconFocused: 'person'},         // Account/Settings section
 ]
 
