@@ -1,100 +1,147 @@
-// PHOTO UPLOADS
-// Everything the app needs to send a photo to Supabase and enter it into a challenge.
+// SUBMISSION UPLOADS
+// Everything the app needs to send a photo or video to Supabase and enter it into a challenge.
 
 // KEY IMPORTS
 import { supabase } from '@/lib/supabase';
 import { fetchMyAccount } from '@/lib/accounts';
 import {getChallengeDate} from '@/utils/challenge-dates';
 import {distanceInMeters} from '@/utils/distance';
-import type {ChallengeLocation, PhotoLocation} from '@/constants/types';
+import {getVideoFile, isValidVideoDuration, MAX_VIDEO_BYTES} from '@/utils/media';
+import type {ChallengeLocation, MediaType, PhotoLocation} from '@/constants/types';
 
 
-// PHOTO LOCATION ERROR
-// Thrown when a photo can't be entered because of where it was taken (or because we don't know where).
+// Which storage bucket each kind of submission lives in
+const BUCKETS: Record<MediaType, string> = {photo: 'photos', video: 'videos'};
+
+// Public web link for a stored submission file
+const getMediaUrl = (mediaType: MediaType, path: string) =>
+    supabase.storage.from(BUCKETS[mediaType]).getPublicUrl(path).data.publicUrl;
+
+
+// WHAT'S BEING SUBMITTED
+// A photo, or a video with its length (the database needs the length to accept a video)
+export type Capture =
+    | {mediaType: 'photo'; uri: string}
+    | {mediaType: 'video'; uri: string; durationMs: number};
+
+
+// CAPTURE LOCATION ERROR
+// Thrown when a photo or video can't be entered because of where it was taken (or because we don't know where).
 // Its message is written for users, so the app can show it as is.
-export class PhotoLocationError extends Error {}
+export class CaptureLocationError extends Error {}
 
 
-// CHECK PHOTO LOCATION
-// Makes sure the photo was taken inside the challenge's circle. Throws PhotoLocationError if not.
+// CHECK CAPTURE LOCATION
+// Makes sure the photo or video was taken inside the challenge's circle. Throws CaptureLocationError if not.
 //   'asserts' tells TypeScript the location is known after this returns
-export function checkPhotoLocation(challenge: ChallengeLocation, location: PhotoLocation | null): asserts location is PhotoLocation {
+export function checkCaptureLocation(
+    challenge: ChallengeLocation,
+    location: PhotoLocation | null,
+    mediaType: MediaType = 'photo',
+): asserts location is PhotoLocation {
     if (!location) {
-        throw new PhotoLocationError("We don't know where this photo was taken, so it can't be entered. Turn on location and try again.");
+        throw new CaptureLocationError(`We don't know where this ${mediaType} was taken, so it can't be entered. Turn on location and try again.`);
     }
     const distance = distanceInMeters(challenge, location);
     if (distance > challenge.radius_m) {
-        throw new PhotoLocationError(
-            `This photo was taken ${Math.round(distance)} m from the challenge. It must be within ${Math.round(challenge.radius_m)} m.`
+        throw new CaptureLocationError(
+            `This ${mediaType} was taken ${Math.round(distance)} m from the challenge. It must be within ${Math.round(challenge.radius_m)} m.`
         );
     }
 }
 
 
-// UPLOAD PHOTO TO A CHALLENGE
-// Takes a photo stored on the phone, checks it was taken inside the challenge's circle,
+// UPLOAD A SUBMISSION TO A CHALLENGE
+// Takes a photo or video stored on the phone, checks it was taken inside the challenge's circle,
 // uploads it, and records it as a submission (with where it was taken).
-// Returns the photo's public web link.
-export async function uploadPhotoToChallenge(
-    localUri: string,
+// Returns the file's public web link.
+export async function uploadSubmission(
+    capture: Capture,
     challenge: ChallengeLocation,
     location: PhotoLocation | null,
 ): Promise<string> {
     const challengeId = challenge.id;
+    const {mediaType, uri} = capture;
 
-    // STEP 0: Stop before uploading anything if the photo is outside the challenge area
-    checkPhotoLocation(challenge, location);
+    // STEP 0: Stop before uploading anything if the challenge wants the other kind of entry,
+    //   or if it was taken outside the challenge area. The database checks the type too.
+    if (mediaType !== challenge.media_type) {
+        throw new Error(`This challenge only accepts ${challenge.media_type}s.`);
+    }
+    checkCaptureLocation(challenge, location, mediaType);
+    if (capture.mediaType === 'video' && !isValidVideoDuration(capture.durationMs)) {
+        throw new Error('Videos must be between 1 and 30 seconds long.');
+    }
 
     // STEP 1: Get the signed-in user (the app only shows its screens to signed-in users)
     const {data: {session}} = await supabase.auth.getSession();
     const user = session?.user;
     if (!user) throw new Error('Please sign in first.');
 
-    // STEP 2: Build the file's path in storage: <userId>/<challengeId>-<timestamp>.jpg
+    // STEP 2: Work out the file type and its path in storage: <userId>/<challengeId>-<timestamp>.<ext>
     //   Starting with the user's ID is required, since the storage rules only let
-    //   users upload into their own folder
-    const filePath = `${user.id}/${challengeId}-${Date.now()}.jpg`;
+    //   users upload into their own folder.
+    //   The camera always saves photos as JPEG; videos are .mov on iOS and .mp4 on Android
+    const file = mediaType === 'photo'
+        ? {extension: 'jpg', contentType: 'image/jpeg'}
+        : getVideoFile(uri);
+    const filePath = `${user.id}/${challengeId}-${Date.now()}.${file.extension}`;
+    const bucket = BUCKETS[mediaType];
 
-    // STEP 3: Read the photo off the phone as raw bytes
-    //   React Native can't upload a file object directly, so we send the bytes instead
-    const fileBytes = await fetch(localUri).then((response) => response.arrayBuffer());
+    // STEP 3: Read the file off the phone as raw bytes
+    //   React Native can't upload a file object directly, so we send the bytes instead.
+    //   Videos are capped at 30 s, which keeps them small enough to hold in memory
+    const fileBytes = await fetch(uri).then((response) => response.arrayBuffer());
+    if (mediaType === 'video' && fileBytes.byteLength > MAX_VIDEO_BYTES) {
+        throw new Error('This video is too large to upload. Try recording a shorter one.');
+    }
 
-    // STEP 4: Upload the bytes to the "photos" storage bucket
+    // STEP 4: Upload the bytes to the matching storage bucket
     const {error: uploadError} = await supabase.storage
-        .from('photos')
-        .upload(filePath, fileBytes, {contentType: 'image/jpeg'});   // the camera always saves JPEG
+        .from(bucket)
+        .upload(filePath, fileBytes, {contentType: file.contentType});
     if (uploadError) throw uploadError;
 
     // STEP 5: Record the submission in the database (account_id is filled in automatically from the signed-in user's account)
+    //   image_path holds the file's path for both photos and videos
     const {error: insertError} = await supabase
         .from('submissions')
-        .insert({challenge_id: challengeId, image_path: filePath, latitude: location.latitude, longitude: location.longitude});
+        .insert({
+            challenge_id: challengeId,
+            image_path: filePath,
+            media_type: mediaType,
+            duration_ms: capture.mediaType === 'video' ? capture.durationMs : null,
+            latitude: location.latitude,
+            longitude: location.longitude,
+        });
 
     // STEP 6: If saving the submission failed, delete the uploaded file so nothing is left orphaned
     if (insertError) {
         //   Supabase methods resolve with {error} instead of throwing, so check it:
         //   a silent failure here leaves the orphaned file this step exists to prevent
-        const {error: removeError} = await supabase.storage.from('photos').remove([filePath]);
+        const {error: removeError} = await supabase.storage.from(bucket).remove([filePath]);
         if (removeError) console.error('Orphaned file left in storage:', filePath, removeError);
         throw insertError;
     }
 
-    // STEP 7: Return the photo's public link, so the app can display it later
-    const {data} = supabase.storage.from('photos').getPublicUrl(filePath);
-    return data.publicUrl;
+    // STEP 7: Return the file's public link, so the app can display it later
+    return getMediaUrl(mediaType, filePath);
 }
 
 
 // SUBMISSION TYPE
-// One photo the user has submitted, ready to display
+// One photo or video the user has submitted, ready to display
+//   imageUrl is the file's public link, for videos too (the grids learn to play videos in a later change)
 export type Submission = {
     id: string
     imageUrl: string
+    mediaType: MediaType
+    durationMs: number | null   // videos only
     challengeTitle: string
     createdAt: string
 }
 
-export type SubmissionPhoto = Pick<Submission, 'id' | 'imageUrl' | 'createdAt'> & {
+export type SubmissionPhoto = Pick<Submission, 'id' | 'imageUrl' | 'mediaType' | 'durationMs' | 'createdAt'> & {
     username: string;
     isOwn: boolean;
 };
@@ -104,12 +151,14 @@ export async function fetchChallengeSubmissions(challengeId: string): Promise<{p
     const account = await fetchMyAccount();
     const {data, error, count} = await supabase
         .from('submissions')
-        .select('id, image_path, created_at, account_id, accounts(username)', {count: 'exact'})
+        .select('id, image_path, media_type, duration_ms, created_at, account_id, accounts(username)', {count: 'exact'})
         .eq('challenge_id', challengeId)
         .order('created_at', {ascending: false})
         .overrideTypes<{
             id: string;
             image_path: string;
+            media_type: MediaType;
+            duration_ms: number | null;
             created_at: string;
             account_id: string;
             accounts: {username: string} | null;
@@ -117,7 +166,9 @@ export async function fetchChallengeSubmissions(challengeId: string): Promise<{p
     if (error) throw error;
     const photos = (data ?? []).map((row) => ({
         id: row.id,
-        imageUrl: supabase.storage.from('photos').getPublicUrl(row.image_path).data.publicUrl,
+        imageUrl: getMediaUrl(row.media_type, row.image_path),
+        mediaType: row.media_type,
+        durationMs: row.duration_ms,
         createdAt: row.created_at,
         username: row.accounts?.username ?? 'unknown',
         isOwn: row.account_id === account?.id,
@@ -126,7 +177,7 @@ export async function fetchChallengeSubmissions(challengeId: string): Promise<{p
 }
 
 // FETCH MY SUBMISSIONS
-// Gets every photo the signed-in user has submitted, newest first (used by the gallery)
+// Gets every photo and video the signed-in user has submitted, newest first (used by the gallery)
 export async function fetchMySubmissions(): Promise<Submission[]> {
     // STEP 1: Get the signed-in user's account
     const account = await fetchMyAccount();
@@ -136,7 +187,7 @@ export async function fetchMySubmissions(): Promise<Submission[]> {
     //   including each one's challenge title (joined through challenge_id)
     const {data, error} = await supabase
         .from('submissions')
-        .select('id, image_path, created_at, challenges!inner(title)')
+        .select('id, image_path, media_type, duration_ms, created_at, challenges!inner(title)')
         .gte('challenges.end_at', getChallengeDate())
         .eq('account_id', account.id)
         .order('created_at', {ascending: false});
@@ -148,7 +199,9 @@ export async function fetchMySubmissions(): Promise<Submission[]> {
     //   converting the storage path into a public image link
     return (data ?? []).map((row: any) => ({
         id: row.id,
-        imageUrl: supabase.storage.from('photos').getPublicUrl(row.image_path).data.publicUrl,
+        imageUrl: getMediaUrl(row.media_type, row.image_path),
+        mediaType: row.media_type,
+        durationMs: row.duration_ms,
         challengeTitle: row.challenges?.title ?? 'Unknown challenge',
         createdAt: row.created_at,
     }));

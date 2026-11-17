@@ -15,7 +15,7 @@ import {useFocusEffect} from 'expo-router';
 // Internal imports
 import {photoCaptureStyles} from '@/constants/styles'
 import type {ChallengeLocation, PhotoLocation} from '@/constants/types';
-import {PhotoLocationError, uploadPhotoToChallenge} from '@/lib/photos';
+import {CaptureLocationError, uploadSubmission} from '@/lib/photos';
 import SubmissionsGallery from '@/components/capture/SubmissionsGallery';
 import RoundButton from '@/components/capture/ButtonRound';
 import TextButton from '@/components/capture/ButtonWithText';
@@ -145,14 +145,14 @@ export default function ChallengeCamera({challenge, onClose}: ChallengeCameraPro
         try {
             // STEP 3: Upload the photo and record the submission (see src/lib/photos.ts)
             //   Also checks the photo was taken inside the challenge's radius
-            await uploadPhotoToChallenge(photoUri, challenge, photoLocation);
+            await uploadSubmission({mediaType: 'photo', uri: photoUri}, challenge, photoLocation);
 
             // STEP 4: Confirm success and go back to the camera
             Alert.alert('Photo submitted!', `Your photo was entered into "${challenge.title}".`);
             resetPhoto();
         } catch (err) {
             // STEP 5: On failure, keep the photo on screen so the user can try again
-            if (err instanceof PhotoLocationError) {
+            if (err instanceof CaptureLocationError) {
                 Alert.alert("Can't enter this photo", err.message);
             } else {
                 console.error("Upload failed: ", err);
