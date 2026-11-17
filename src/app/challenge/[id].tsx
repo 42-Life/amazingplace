@@ -1,6 +1,6 @@
 // CHALLENGE SCREEN
 // One challenge's title and description. Opened by the "View challenge" button on the map.
-// This is the only place the camera lives: photos taken here go to this challenge only.
+// This is the only place the camera lives: photos (or videos) taken here go to this challenge only.
 
 // KEY IMPORTS
 // Hooks
@@ -12,6 +12,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 // Internal imports
 import ChallengeCamera from '@/components/capture/ChallengeCamera';
+import ChallengeVideoCamera from '@/components/capture/ChallengeVideoCamera';
 import ChallengeSubmissionsGrid from '@/components/capture/ChallengeSubmissionsGrid';
 import ChallengeAreaMap, { formatRadius } from '@/components/ChallengeAreaMap';
 import { challengeDetailStyles as styles } from '@/constants/styles';
@@ -70,9 +71,15 @@ export default function ChallengeScreen() {
 
     }, [id])   // re-runs if the user opens a different challenge
 
+    const isVideoChallenge = challenge?.media_type === 'video';
+
     // CAMERA: takes over the whole screen, locked to this challenge
+    //   Video challenges get the video camera, photo challenges the photo camera
     if (isCameraOpen && challenge) {
-        return <ChallengeCamera challenge={challenge} onClose={() => setIsCameraOpen(false)} />
+        const closeCamera = () => setIsCameraOpen(false);
+        return isVideoChallenge
+            ? <ChallengeVideoCamera challenge={challenge} onClose={closeCamera} />
+            : <ChallengeCamera challenge={challenge} onClose={closeCamera} />
     }
 
     return(
@@ -96,6 +103,7 @@ export default function ChallengeScreen() {
                         challengeId={challenge.id}
                         header={(submissionCount) => <View style={styles.details}>
                             <Text style={styles.title}>{challenge.title}</Text>
+                            <Text style={[styles.submissionTag, styles.typeTag]}>{isVideoChallenge ? 'Video challenge' : 'Photo challenge'}</Text>
                             <ChallengeAreaMap
                                 coordinate={{latitude: Number(challenge.latitude), longitude: Number(challenge.longitude)}}
                                 radiusM={Number(challenge.radius_m)}
@@ -103,7 +111,7 @@ export default function ChallengeScreen() {
                             />
                             <Text style={styles.description}>{challenge.description}</Text>
                             <View style={styles.radiusRow}>
-                                <Text style={styles.areaTitle}>Photo radius: {formatRadius(Number(challenge.radius_m))}</Text>
+                                <Text style={styles.areaTitle}>{isVideoChallenge ? 'Video' : 'Photo'} radius: {formatRadius(Number(challenge.radius_m))}</Text>
                                 <Text style={styles.submissionTag} accessibilityLiveRegion="polite">
                                     {submissionCount === null ? 'Submissions: —' : `${submissionCount.toLocaleString()} ${submissionCount === 1 ? 'submission' : 'submissions'}`}
                                 </Text>
@@ -119,7 +127,7 @@ export default function ChallengeScreen() {
                             accessibilityRole="button"
                             style={({pressed}) => [styles.enterButton, pressed && styles.enterButtonPressed]}
                         >
-                            <Text style={styles.enterButtonText}>Enter Challenge</Text>
+                            <Text style={styles.enterButtonText}>{isVideoChallenge ? 'Record Video' : 'Enter Challenge'}</Text>
                         </Pressable>
                     </View>
                 </>

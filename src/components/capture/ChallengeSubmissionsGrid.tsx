@@ -4,6 +4,7 @@ import {fetchChallengeSubmissions, type SubmissionPhoto} from '@/lib/photos';
 import {theme} from '@/constants/theme';
 import PhotoGrid, {type GridPhoto} from './PhotoGrid';
 import ImageViewer from './ImageViewer';
+import VideoViewer from './VideoViewer';
 
 export default function ChallengeSubmissionsGrid({challengeId, header}: {challengeId: string; header: (submissionCount: number | null) => ReactElement}) {
     const [photos, setPhotos] = useState<SubmissionPhoto[]>([]);
@@ -48,11 +49,13 @@ export default function ChallengeSubmissionsGrid({challengeId, header}: {challen
                                 <Pressable onPress={refresh} accessibilityRole="button" style={styles.retry}>
                                     <Text style={styles.link}>Try again</Text>
                                 </Pressable>
-                            </> : photos.length === 0 ? <Text style={styles.message}>No photos yet. Be the first to enter!</Text> : null}
+                            </> : photos.length === 0 ? <Text style={styles.message}>No entries yet. Be the first to enter!</Text> : null}
                     </View>
                 }
             />
-            {selected && <ImageViewer key={selected.id} imageUrl={selected.imageUrl} onClose={() => setSelected(null)} />}
+            {selected && (selected.mediaType === 'video'
+                ? <VideoViewer key={selected.id} videoUrl={selected.imageUrl} onClose={() => setSelected(null)} />
+                : <ImageViewer key={selected.id} imageUrl={selected.imageUrl} onClose={() => setSelected(null)} />)}
         </>
     );
 }

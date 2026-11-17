@@ -18,8 +18,9 @@ import {createChallengeStyles as styles} from '@/constants/styles';
 import {createChallenge} from '@/lib/challenges';
 import DateSelector from '@/components/explore/DateSelector';
 import ChallengeAreaMap, {formatRadius} from '@/components/ChallengeAreaMap';
+import MediaTypePicker from '@/components/MediaTypePicker';
 import {getChallengeDate} from '@/utils/challenge-dates';
-import type {ChallengeLocation} from '@/constants/types';
+import type {ChallengeLocation, MediaType} from '@/constants/types';
 
 // Where the map starts on step 2: BU College of Arts and Sciences
 const START_REGION: Region = {
@@ -29,7 +30,7 @@ const START_REGION: Region = {
     longitudeDelta: 0.01,
 }
 
-// Radius slider: how far from the pin photos may be taken, in meters
+// Radius slider: how far from the pin photos and videos may be taken, in meters
 const MIN_RADIUS_M = 25;
 const MAX_RADIUS_M = 1000;
 const RADIUS_STEP_M = 25;
@@ -60,8 +61,9 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
     const [step, setStep] = useState(1);
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
+    const [mediaType, setMediaType] = useState<MediaType>('photo');  // whether entries are photos or videos
     const [coordinate, setCoordinate] = useState(startCoordinate);   // the spot under the pin
-    const [radiusM, setRadiusM] = useState(DEFAULT_RADIUS_M);        // photos must be taken within this many meters of the pin
+    const [radiusM, setRadiusM] = useState(DEFAULT_RADIUS_M);        // entries must be taken within this many meters of the pin
     const [startAt, setStartAt] = useState(getChallengeDate());      // first day of the challenge, YYYY-MM-DD (starts as today)
     const [endAt, setEndAt] = useState('');                         // last day of the challenge, YYYY-MM-DD ('' = not picked yet)
     const [isSubmitting, setIsSubmitting] = useState(false);         // true while saving; blocks double submits
@@ -76,11 +78,16 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
     }
     const canGoNext = step === 1 ? isDetailsValid : true;
 
+    // Wording that changes with the entry type
+    const captureVerb = mediaType === 'video' ? 'film' : 'photograph';       // "What should people film?"
+    const radiusLabel = `${mediaType === 'video' ? 'Video' : 'Photo'} radius`;
+
     // Reset the form back to a blank step 1
     const resetForm = () => {
         setStep(1);
         setTitle('');
         setDescription('');
+        setMediaType('photo');
         setCoordinate(startCoordinate);
         setRadiusM(DEFAULT_RADIUS_M);
         setStartAt(getChallengeDate());
@@ -99,7 +106,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
         setIsSubmitting(true);
         try {
             // STEP 1: Save the challenge
-            const created = await createChallenge({title, description, ...coordinate, radius_m: radiusM, start_at: startAt, end_at: endAt});
+            const created = await createChallenge({title, description, ...coordinate, radius_m: radiusM, start_at: startAt, end_at: endAt, media_type: mediaType});
 
             // STEP 2: Confirm success
             Alert.alert('Challenge created', `"${created.title}" is now live on the map.`);
@@ -126,12 +133,20 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
                         maxLength={80}
                     />
 
+                    <Text style={styles.label}>Entries</Text>
+                    <MediaTypePicker value={mediaType} onChange={setMediaType} />
+                    <Text style={styles.hint}>
+                        {mediaType === 'video'
+                            ? 'People record a video of up to 30 seconds, with sound.'
+                            : 'People take a photo.'} This can’t be changed later.
+                    </Text>
+
                     <Text style={styles.label}>Description</Text>
                     <TextInput
                         style={[styles.input, styles.inputMultiline]}
                         value={description}
                         onChangeText={setDescription}
-                        placeholder="What should people photograph?"
+                        placeholder={`What should people ${captureVerb}?`}
                         placeholderTextColor={colors.inactive}
                         multiline
                         maxLength={500}
@@ -162,7 +177,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
     // STEP 2: PICK LOCATION AND RADIUS
     //   The pin never moves on screen. The user drags the map under it,
     //   and whatever is at the centre when they let go is the location.
-    //   The slider below sets how far from the pin photos may be taken (drawn as a circle).
+    //   The slider below sets how far from the pin entries may be taken (drawn as a circle).
     //   With a fixedCoordinate the map is locked on that spot and zooms to fit the circle instead.
     function LocationStep() {
         return(
@@ -175,7 +190,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
 
             {/* Radius slider */}
             <View style={styles.radiusPanel}>
-                <Text style={styles.label}>Photo radius: {formatRadius(radiusM)}</Text>
+                <Text style={styles.label}>{radiusLabel}: {formatRadius(radiusM)}</Text>
                 <Slider
                     value={radiusM}
                     minimumValue={MIN_RADIUS_M}
@@ -183,9 +198,9 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
                     step={RADIUS_STEP_M}
                     onValueChange={(value) => setRadiusM(Math.round(value / RADIUS_STEP_M) * RADIUS_STEP_M)}
                     minimumTrackTintColor={colors.active}
-                    accessibilityLabel="Photo radius"
+                    accessibilityLabel={radiusLabel}
                 />
-                <Text style={styles.hint}>Photos must be taken within this distance of the pin.</Text>
+                <Text style={styles.hint}>{mediaType === 'video' ? 'Videos' : 'Photos'} must be taken within this distance of the pin.</Text>
             </View>
             </View>
         )
@@ -197,6 +212,9 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
             <ScrollView style={styles.body} contentContainerStyle={styles.formContent}>
                 <Text style={styles.label}>Name</Text>
                 <Text style={styles.reviewValue}>{title.trim()}</Text>
+
+                <Text style={styles.label}>Entries</Text>
+                <Text style={styles.reviewValue}>{mediaType === 'video' ? 'Videos (up to 30 seconds)' : 'Photos'}</Text>
 
                 <Text style={styles.label}>Description</Text>
                 <Text style={styles.reviewValue}>{description.trim()}</Text>
@@ -213,7 +231,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
                 <Text style={styles.label}>Ends</Text>
                 <Text style={styles.reviewValue}>{formatDate(endAt)}</Text>
 
-                <Text style={styles.label}>Photo radius</Text>
+                <Text style={styles.label}>{radiusLabel}</Text>
                 <Text style={styles.reviewValue}>{formatRadius(radiusM)}</Text>
 
                 <Text style={styles.label}>Location</Text>

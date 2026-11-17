@@ -5,17 +5,16 @@
 
 // KEY IMPORTS
 // Hooks
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useRef, useState} from 'react';
 // React and Expo functions and components
 import {ActivityIndicator, Alert, Image, Linking, Pressable, StyleSheet, Text, View} from 'react-native';
 import {CameraView, useCameraPermissions, type CameraType} from 'expo-camera';
-import * as Location from 'expo-location';
-import {LocationAccuracy} from 'expo-location';
 import {useFocusEffect} from 'expo-router';
 // Internal imports
 import {photoCaptureStyles} from '@/constants/styles'
 import type {ChallengeLocation, PhotoLocation} from '@/constants/types';
-import {PhotoLocationError, uploadPhotoToChallenge} from '@/lib/photos';
+import {SubmissionError, uploadSubmission} from '@/lib/photos';
+import {useLiveLocation} from '@/hooks/use-live-location';
 import SubmissionsGallery from '@/components/capture/SubmissionsGallery';
 import RoundButton from '@/components/capture/ButtonRound';
 import TextButton from '@/components/capture/ButtonWithText';
@@ -38,8 +37,8 @@ export default function ChallengeCamera({challenge, onClose}: ChallengeCameraPro
     const [isCapturing, setIsCapturing] = useState(false);          // state determines whether user is taking a photo & blocks double tap based on that
     const [photoLocation, setPhotoLocation] = useState<PhotoLocation | null>(null);   // where the current photo was taken (null = unknown)
 
-    // Latest GPS reading while the camera is open, so a photo gets its location instantly
-    const latestLocation = useRef<PhotoLocation | null>(null);
+    // Where the user is right now (tracked while the camera is open, see src/hooks/use-live-location.ts)
+    const getCurrentLocation = useLiveLocation();
 
     // Submission state
     const [isUploading, setIsUploading] = useState(false);                   // true while a photo is uploading; blocks double submits
@@ -53,52 +52,6 @@ export default function ChallengeCamera({challenge, onClose}: ChallengeCameraPro
             return () => {setIsFocused(false);};  // false when another screen covers it
         }, [])
     );
-
-    // TRACK LOCATION WHILE THE CAMERA IS OPEN
-    useEffect(() => {
-        let isMounted = true;
-        let subscription: Location.LocationSubscription | null = null;
-
-        (async () => {
-            try {
-                // STEP 1: Ask for location permission (no prompt if already granted)
-                const {status} = await Location.requestForegroundPermissionsAsync();
-                if (status !== 'granted' || !isMounted) return;
-
-                // STEP 2: Keep the latest reading. High = about 10 m accuracy
-                const sub = await Location.watchPositionAsync(
-                    {accuracy: LocationAccuracy.High, distanceInterval: 5},
-                    (position) => {
-                        latestLocation.current = {latitude: position.coords.latitude, longitude: position.coords.longitude};
-                    }
-                );
-                if (isMounted) subscription = sub;
-                else sub.remove();      // camera closed while we were starting up
-            } catch (err) {
-                console.error("Could not track location for photos: ", err);
-            }
-        })();
-
-        // STEP 3: Stop tracking when the camera closes
-        return () => {
-            isMounted = false;
-            subscription?.remove();
-        };
-    }, []);
-
-    // Where the user is right now: the latest tracked reading, or a fresh one if none has arrived yet
-    const getCurrentLocation = async (): Promise<PhotoLocation | null> => {
-        if (latestLocation.current) return latestLocation.current;
-        try {
-            const {status} = await Location.getForegroundPermissionsAsync();
-            if (status !== 'granted') return null;
-            const position = await Location.getCurrentPositionAsync({accuracy: LocationAccuracy.High});
-            return {latitude: position.coords.latitude, longitude: position.coords.longitude};
-        } catch (err) {
-            console.error("Could not get location for photo: ", err);
-            return null;
-        }
-    }
 
     // KEY HANDLER: PHOTO CAPTURE
     const takePhoto = async () => {
@@ -145,14 +98,14 @@ export default function ChallengeCamera({challenge, onClose}: ChallengeCameraPro
         try {
             // STEP 3: Upload the photo and record the submission (see src/lib/photos.ts)
             //   Also checks the photo was taken inside the challenge's radius
-            await uploadPhotoToChallenge(photoUri, challenge, photoLocation);
+            await uploadSubmission({mediaType: 'photo', uri: photoUri}, challenge, photoLocation);
 
             // STEP 4: Confirm success and go back to the camera
             Alert.alert('Photo submitted!', `Your photo was entered into "${challenge.title}".`);
             resetPhoto();
         } catch (err) {
             // STEP 5: On failure, keep the photo on screen so the user can try again
-            if (err instanceof PhotoLocationError) {
+            if (err instanceof SubmissionError) {
                 Alert.alert("Can't enter this photo", err.message);
             } else {
                 console.error("Upload failed: ", err);

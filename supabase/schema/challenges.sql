@@ -9,11 +9,13 @@ create table public.challenges (
     start_at date not null,
     radius_m double precision not null default 100,
     creator_account_id uuid default public.current_account_id(),
+    media_type text not null default 'photo',
 
     constraint challenges_pkey primary key (id),
     constraint challenges_creator_account_id_fkey foreign key (creator_account_id)
         references public.accounts (id) on delete cascade,
-    constraint challenges_radius_m_check check (radius_m > 0)
+    constraint challenges_radius_m_check check (radius_m > 0),
+    constraint challenges_media_type_check check (media_type in ('photo', 'video'))
 );
 
 alter table public.challenges enable row level security;
