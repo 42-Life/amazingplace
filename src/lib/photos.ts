@@ -140,7 +140,7 @@ export async function uploadSubmission(
 
 // SUBMISSION TYPE
 // One photo or video the user has submitted, ready to display
-//   imageUrl is the file's public link, for videos too (the grids learn to play videos in a later change)
+//   imageUrl is the file's public link, for videos too (grids show videos as play tiles, see VideoTile)
 export type Submission = {
     id: string
     imageUrl: string
