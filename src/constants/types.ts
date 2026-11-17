@@ -63,3 +63,9 @@ export type TextButtonProps = {
     disabled?: boolean;
     style?: StyleProp<ViewStyle>;
 };
+
+export type Account = {
+    id: string
+    username: string
+    email: string
+}

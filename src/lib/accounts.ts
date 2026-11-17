@@ -4,15 +4,11 @@
 
 // KEY IMPORTS
 import { supabase } from '@/lib/supabase';
+import {Account} from "@/constants/types";
 
 
 // ACCOUNT TYPE
 // One row of the accounts table
-export type Account = {
-    id: string
-    username: string
-    email: string
-}
 
 
 // SIGN UP
