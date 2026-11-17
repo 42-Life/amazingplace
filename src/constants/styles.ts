@@ -216,6 +216,38 @@ export const photoCaptureStyles = StyleSheet.create({
     chooserCancel: {alignItems: 'center', paddingVertical: 10},
     chooserCancelText: {fontSize: 15, fontWeight: '600', color: theme.colors.inactive},
 
+    // Video camera: red record button (a dot that becomes a stop square while recording)
+    recordDot: {width: 58, height: 58, borderRadius: 29, backgroundColor: '#EF4444'},
+    recordStop: {width: 28, height: 28, borderRadius: 6, backgroundColor: '#EF4444'},
+
+    // Video camera: timer pill at the top, red while recording
+    timer: {
+        position: 'absolute',
+        alignSelf: 'center',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingVertical: 6,
+        paddingHorizontal: 14,
+        borderRadius: 16,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+    },
+    timerRecording: {backgroundColor: '#EF4444'},
+    timerText: {color: '#FFFFFF', fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums']},
+
+    // Video camera: small note above the controls (e.g. recording without sound)
+    notice: {
+        position: 'absolute',
+        left: 24,
+        right: 24,
+        bottom: 120,
+        color: '#FFFFFF',
+        fontSize: 14,
+        textAlign: 'center',
+        textShadowColor: 'rgba(0,0,0,0.8)',
+        textShadowRadius: 4,
+    },
+
     // Dark overlay with a spinner shown while a photo is uploading
     uploadingOverlay: {
         position: 'absolute',

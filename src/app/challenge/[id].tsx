@@ -8,10 +8,11 @@ import { useEffect, useState } from 'react';
 // React and Expo functions and components
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 // Internal imports
 import ChallengeCamera from '@/components/capture/ChallengeCamera';
+import ChallengeVideoCamera from '@/components/capture/ChallengeVideoCamera';
 import ChallengeSubmissionsGrid from '@/components/capture/ChallengeSubmissionsGrid';
 import ChallengeAreaMap, { formatRadius } from '@/components/ChallengeAreaMap';
 import { challengeDetailStyles as styles } from '@/constants/styles';
@@ -72,20 +73,13 @@ export default function ChallengeScreen() {
 
     const isVideoChallenge = challenge?.media_type === 'video';
 
-    // ENTER: opens the camera, locked to this challenge
-    //   TEMPORARY: video recording isn't built yet, so video challenges explain that instead of
-    //   opening the photo camera (whose photos this challenge would reject). Replaced by the video camera.
-    const enterChallenge = () => {
-        if (isVideoChallenge) {
-            Alert.alert('Coming soon', 'Recording videos for challenges is almost ready. Check back soon.');
-            return;
-        }
-        setIsCameraOpen(true);
-    }
-
     // CAMERA: takes over the whole screen, locked to this challenge
+    //   Video challenges get the video camera, photo challenges the photo camera
     if (isCameraOpen && challenge) {
-        return <ChallengeCamera challenge={challenge} onClose={() => setIsCameraOpen(false)} />
+        const closeCamera = () => setIsCameraOpen(false);
+        return isVideoChallenge
+            ? <ChallengeVideoCamera challenge={challenge} onClose={closeCamera} />
+            : <ChallengeCamera challenge={challenge} onClose={closeCamera} />
     }
 
     return(
@@ -129,7 +123,7 @@ export default function ChallengeScreen() {
                     />
                     <View style={styles.footer}>
                         <Pressable
-                            onPress={enterChallenge}
+                            onPress={() => setIsCameraOpen(true)}
                             accessibilityRole="button"
                             style={({pressed}) => [styles.enterButton, pressed && styles.enterButtonPressed]}
                         >
