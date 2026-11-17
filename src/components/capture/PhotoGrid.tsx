@@ -2,8 +2,11 @@ import type {ReactElement} from 'react';
 import {Pressable, RefreshControl, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {Image} from 'expo-image';
 import {theme} from '@/constants/theme';
+import type {MediaType} from '@/constants/types';
+import VideoTile from './VideoTile';
 
-export type GridPhoto = {id: string; imageUrl: string; username: string; isOwn: boolean};
+// One submission in the grid. imageUrl is the file's link, for videos too.
+export type GridPhoto = {id: string; imageUrl: string; mediaType: MediaType; durationMs: number | null; username: string; isOwn: boolean};
 
 type Props = {
     photos: GridPhoto[];
@@ -31,9 +34,12 @@ export default function PhotoGrid({photos, onPhotoPress, header, footer, refresh
                                 style={styles.tile}
                                 onPress={() => onPhotoPress(photo)}
                                 accessibilityRole="button"
-                                accessibilityLabel={photo.isOwn ? 'Open your submission' : `Open submission by @${photo.username}`}
+                                accessibilityLabel={`${photo.mediaType === 'video' ? 'Play' : 'Open'} ${photo.isOwn ? 'your submission' : `submission by @${photo.username}`}`}
                             >
-                                <Image source={{uri: photo.imageUrl}} recyclingKey={photo.id} style={styles.image} contentFit="cover" />
+                                {/* Videos show a play tile instead of loading the video (see VideoTile) */}
+                                {photo.mediaType === 'video'
+                                    ? <VideoTile durationMs={photo.durationMs} style={styles.image} />
+                                    : <Image source={{uri: photo.imageUrl}} recyclingKey={photo.id} style={styles.image} contentFit="cover" />}
                                 <Text style={styles.username} numberOfLines={2} ellipsizeMode="tail">
                                     {photo.isOwn ? 'Your submission' : `@${photo.username}`}
                                 </Text>
