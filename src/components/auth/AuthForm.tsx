@@ -10,12 +10,19 @@ import {theme} from '@/constants/theme';
 import {authStyles as styles} from '@/constants/styles';
 import {signIn, signUp} from '@/lib/accounts';
 
+// types
+type AuthMode = 'signIn' | 'signUp';
+type AuthProps = {
+    initialMode?: AuthMode;
+    onBack: () => void;
+};
+
 // MAIN FUNCTION
-export default function AuthForm() {
+export default function AuthForm({ initialMode = 'signUp', onBack }: AuthProps) {
     const {colors} = theme;
 
     // STATE: which mode we're in, what's typed, and what to tell the user
-    const [mode, setMode] = useState<'signIn' | 'signUp'>('signUp');
+    const [mode, setMode] = useState<AuthMode>(initialMode);
     const [email, setEmail] = useState('');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -103,6 +110,9 @@ export default function AuthForm() {
                         <Text style={styles.switchText}>
                             {isSignUp ? 'Already have an account? Sign in' : 'New here? Create an account'}
                         </Text>
+                    </Pressable>
+                    <Pressable onPress={onBack}>
+                        <Text style={styles.switchText}>← Return to Welcome Screen</Text>
                     </Pressable>
                 </ScrollView>
             </KeyboardAvoidingView>
