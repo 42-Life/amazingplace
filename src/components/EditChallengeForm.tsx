@@ -7,9 +7,10 @@ import DateSelector from '@/components/explore/DateSelector';
 import ChallengeAreaMap from '@/components/ChallengeAreaMap';
 import {deleteChallenge, updateChallenge} from '@/lib/challenges';
 import {getChallengeDate} from '@/utils/challenge-dates';
-import type {ChallengeLocation} from '@/constants/types';
+import type {ChallengeLocation, ChallengeTagId} from '@/constants/types';
 import {createChallengeStyles as formStyles} from '@/constants/styles';
 import {theme} from '@/constants/theme';
+import ChallengeTagPicker from '@/components/ChallengeTagPicker';
 
 export default function EditChallengeForm({challenge, onClose}: {challenge: ChallengeLocation; onClose: () => void}) {
     const [title, setTitle] = useState(challenge.title);
@@ -21,6 +22,9 @@ export default function EditChallengeForm({challenge, onClose}: {challenge: Chal
     const [busy, setBusy] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [tags, setTags] = useState<ChallengeTagId[]>(
+        challenge.tags ?? []
+    );
 
     const today = getChallengeDate();
     const canChangeStartAndLocation = challenge.start_at > today;
@@ -42,7 +46,7 @@ export default function EditChallengeForm({challenge, onClose}: {challenge: Chal
         setBusy(true);
         try {
             await updateChallenge(challenge.id, {
-                title, description, end_at: endAt,
+                title, description, end_at: endAt, tags,
                 ...(canChangeStartAndLocation ? {start_at: startAt, ...coordinate} : {}),
             });
             onClose();
@@ -82,6 +86,15 @@ export default function EditChallengeForm({challenge, onClose}: {challenge: Chal
                         <TextInput accessibilityLabel="Challenge title" value={title} onChangeText={setTitle} maxLength={80} style={formStyles.input} />
                         <Text style={formStyles.label}>Description</Text>
                         <TextInput accessibilityLabel="Challenge description" value={description} onChangeText={setDescription} maxLength={500} multiline style={[formStyles.input, formStyles.inputMultiline]} />
+
+                        {/* TODO: Check if formStyles.label is fine for categories */}
+                        <Text style={formStyles.label}>Categories</Text>
+
+                        <ChallengeTagPicker
+                            value={tags}
+                            onChange={setTags}
+                            disabled={busy}
+                        />
 
                         <Text style={formStyles.label}>Entries</Text>
                         <Text style={formStyles.reviewValue}>{challenge.media_type === 'video' ? 'Videos (up to 30 seconds)' : 'Photos'}</Text>

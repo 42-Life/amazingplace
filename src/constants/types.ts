@@ -37,6 +37,7 @@ export type ChallengeLocation = {
     end_at: string          // last day of the challenge, YYYY-MM-DD
     radius_m: number        // photos and videos must be taken within this many meters of the pin
     media_type: MediaType   // whether entries are photos or videos
+    tags: ChallengeTagId[]
     price_cents: number     // entry fee in cents (0 = free). Stored in cents so no rounding can lose a penny
 }
 
@@ -70,3 +71,39 @@ export type Account = {
     username: string
     email: string
 }
+
+// Challenge Tags
+export type ChallengeTagId =
+    | 'pranks_humor'
+    | 'dares_skits'
+    | 'everyday_life'
+    | 'nature_scenery'
+    | 'art_music'
+    | 'sports_fitness'
+    | 'photography'
+    | 'food_drink'
+    | 'animals_pets'
+    | 'scavenger_hunt'
+    | 'community_kindness'
+    | 'other';
+
+export type ChallengeTagProps = {
+    tags: readonly string[] | null | undefined;
+};
+
+export type ChallengeTagDefinition = {
+    id: ChallengeTagId;
+    label: string;
+    icon: ComponentProps<typeof Ionicons>['name'];
+    color: string;
+    // Option C: very subtle category tint mixed into a neutral grey pill.
+    backgroundColor: string;
+    // Option A: stronger category-specific tinted background.
+    optionABackgroundColor: string;
+};
+
+export type ChallengeTagPickerProps = {
+    value: ChallengeTagId[];
+    onChange: (next: ChallengeTagId[]) => void;
+    disabled?: boolean;
+};

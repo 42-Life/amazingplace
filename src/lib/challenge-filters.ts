@@ -1,12 +1,12 @@
-import type { ChallengeLocation, MediaType } from '@/constants/types';
+import type { ChallengeLocation, MediaType, ChallengeTagId } from '@/constants/types';
 import { filterChallengesByStartDate, type ChallengeStartDateFilter } from '@/lib/filter';
 
 export type MediaTypeFilter = 'any' | MediaType;
 
 export type ChallengeFilters = ChallengeStartDateFilter & {
     mediaType: MediaTypeFilter;
-    maxDistanceMiles: number | null;   // null = no distance limit
-    // later: tags: string[]
+    maxDistanceMiles: number | null;
+    tags: ChallengeTagId[];
 };
 
 export const NO_FILTERS: ChallengeFilters = {
@@ -14,6 +14,7 @@ export const NO_FILTERS: ChallengeFilters = {
     through: '',
     mediaType: 'any',
     maxDistanceMiles: null,
+    tags: [],
 };
 
 export const DISTANCE_OPTIONS_MILES = [1, 5, 10, 25];
@@ -39,7 +40,8 @@ export function countActiveFilters(f: ChallengeFilters): number {
     return (
         (f.from || f.through ? 1 : 0) +
         (f.mediaType !== 'any' ? 1 : 0) +
-        (f.maxDistanceMiles !== null ? 1 : 0)
+        (f.maxDistanceMiles !== null ? 1 : 0) +
+        (f.tags.length > 0 ? 1 : 0)
     );
 }
 
@@ -48,8 +50,17 @@ export function applyChallengeFilters(
     filters: ChallengeFilters,
     userCoordinate: Point | null,
 ): ChallengeLocation[] {
+    // Step 1: Date Filtering
     let result = filterChallengesByStartDate(challenges, filters);
 
+    // Step 2: Category filtering / matching
+    if (filters.tags.length > 0) {
+        result = result.filter((challenge) =>
+            filters.tags.some((tag) => challenge.tags?.includes(tag))
+        );
+    }
+
+    // Step 3: Photo/Video filtering
     if (filters.mediaType !== 'any') {
         // A future 'both' challenge matches either choice
         result = result.filter(
@@ -57,6 +68,7 @@ export function applyChallengeFilters(
         );
     }
 
+    //  // 4. Distance filtering
     // Skipped if we don't know where the user is (the modal disables the option in that case)
     if (filters.maxDistanceMiles !== null && userCoordinate) {
         const maxMeters = filters.maxDistanceMiles * METERS_PER_MILE;
@@ -65,6 +77,13 @@ export function applyChallengeFilters(
             .filter(({ d }) => d <= maxMeters)
             .sort((x, y) => x.d - y.d)      // nearest first
             .map(({ c }) => c);
+    }
+
+    // A challenge matches if it has at least one of the selected categories.
+    if (filters.tags.length > 0) {
+        result = result.filter((challenge) =>
+            filters.tags.some((tag) => challenge.tags?.includes(tag))
+        );
     }
 
     return result;

@@ -6,11 +6,13 @@ import type { ChallengeLocation } from '@/constants/types';
 import { supabase } from '@/lib/supabase';
 import { fetchMyAccount } from '@/lib/accounts';
 import { getChallengeDate, isValidChallengeDate } from '@/utils/challenge-dates';
+import { normalizeChallengeTags } from '@/utils/challenge-tags';
+import {type ChallengeTagId} from '@/constants/types';
 import { MAX_PRICE_CENTS, MIN_PRICE_CENTS, formatPrice, isValidPriceCents } from '@/utils/price';
 
 
 // The columns every challenge query asks for, so none of them can forget one (e.g. media_type)
-export const CHALLENGE_FIELDS = 'id, title, description, latitude, longitude, start_at, end_at, radius_m, media_type, price_cents';
+export const CHALLENGE_FIELDS = 'id, title, description, latitude, longitude, start_at, end_at, radius_m, media_type, price_cents, tags';
 
 
 // FETCH CHALLENGES
@@ -59,6 +61,7 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
             radius_m: Number(challenge.radius_m),
             media_type: challenge.media_type,
             price_cents: Number(challenge.price_cents ?? 0),
+            tags: normalizeChallengeTags(challenge.tags),
         }]
     })
 
@@ -152,11 +155,18 @@ export async function fetchCreatedChallengeById(id: string): Promise<ChallengeLo
 }
 
 export type ChallengeEdits = Partial<Pick<ChallengeLocation,
-    'title' | 'description' | 'start_at' | 'end_at' | 'latitude' | 'longitude'>>;
+    'title' | 'description' | 'start_at' | 'end_at' | 'latitude' | 'longitude' | 'tags'>>;
 
 // Validate against the latest saved challenge, rather than a potentially stale form.
 export function validateChallengeEdits(current: ChallengeLocation, edits: ChallengeEdits, today = getChallengeDate()): ChallengeEdits {
     const changes: ChallengeEdits = {};
+    if (edits.tags !== undefined) {
+        const tags = normalizeChallengeTags(edits.tags);
+        if (tags.length < 1 || tags.length > 3 || tags.length !== edits.tags.length) {
+            throw new Error('Choose between 1 and 3 valid categories.');
+        }
+        if (JSON.stringify(tags) !== JSON.stringify(current.tags ?? [])) changes.tags = tags;
+    }
     if (edits.title !== undefined && edits.title.trim() !== current.title) {
         const title = edits.title.trim();
         if (!title || title.length > 80) throw new Error('Title must be 1 to 80 characters.');
@@ -296,6 +306,12 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
         throw new Error(`An entry fee must be free, or between ${formatPrice(MIN_PRICE_CENTS)} and ${formatPrice(MAX_PRICE_CENTS)}.`);
     }
 
+    // STEP 2f: Every challenge must have 1-3 recognised category tags.
+    const tags = normalizeChallengeTags(challenge.tags);
+    if (tags.length < 1 || tags.length > 3 || tags.length !== (challenge.tags ?? []).length) {
+        throw new Error('Choose between 1 and 3 valid categories.');
+    }
+
     // STEP 3: Make sure the user is signed in
     const account = await fetchMyAccount();
     if (!account) throw new Error('Please sign in first.');
@@ -306,7 +322,7 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     // STEP 5: Insert the challenge and ask the database to send the saved row back
     const {data, error} = await supabase
         .from('challenges')
-        .insert({id, title, description, latitude, longitude, radius_m, start_at, end_at, media_type, price_cents, creator_account_id: account.id})
+        .insert({id, title, description, latitude, longitude, radius_m, start_at, end_at, media_type, price_cents, tags, creator_account_id: account.id})
         .select(CHALLENGE_FIELDS)
         .single();
 

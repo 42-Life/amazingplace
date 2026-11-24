@@ -44,12 +44,75 @@ export const theme = {
         // darkModeText: '#E5E7EB'
         // darkModeBackground: '#2F2F2F',
 
+        // Challenge Tags
+        challengeTags: {
+            pranksHumor: {
+                color: '#A66A00',
+                backgroundColor: '#F5F1E5',
+                optionABackgroundColor: '#FFF5BF',
+            },
+            daresSkits: {
+                color: '#C23B83',
+                backgroundColor: '#F5EEF2',
+                optionABackgroundColor: '#FBE3F0',
+            },
+            everydayLife: {
+                color: '#64748B',
+                backgroundColor: '#F0F1F3',
+                optionABackgroundColor: '#E2E8F0',
+            },
+            natureScenery: {
+                color: '#16A34A',
+                backgroundColor: '#EDF4EF',
+                optionABackgroundColor: '#DCFCE7',
+            },
+            artMusic: {
+                color: '#8B5CF6',
+                backgroundColor: '#F1EFF6',
+                optionABackgroundColor: '#EDE9FE',
+            },
+            sportsFitness: {
+                color: '#3B82F6',
+                backgroundColor: '#EDF1F7',
+                optionABackgroundColor: '#DBEAFE',
+            },
+            photography: {
+                color: '#06B6D4',
+                backgroundColor: '#EDF3F4',
+                optionABackgroundColor: '#CFFAFE',
+            },
+            foodDrink: {
+                color: '#F97316',
+                backgroundColor: '#F6F0EC',
+                optionABackgroundColor: '#FFEDD5',
+            },
+            animalsPets: {
+                color: '#F43F5E',
+                backgroundColor: '#F6EFF0',
+                optionABackgroundColor: '#FFE4E6',
+            },
+            scavengerHunt: {
+                color: '#84CC16',
+                backgroundColor: '#F1F3E9',
+                optionABackgroundColor: '#ECFCCB',
+            },
+            communityKindness: {
+                color: '#6366F1',
+                backgroundColor: '#F0F0F6',
+                optionABackgroundColor: '#E0E7FF',
+            },
+            other: {
+                color: '#64748B',
+                backgroundColor: '#F1F2F4',
+                optionABackgroundColor: '#E5E7EB',
+            },
+        },
     },
 
     // Styling for TabBar (bottom menu with key sections)
     tabBar: {
         iconSize: 24,
-    }
+    },
 };
 
 // frosted blue: 9ad1d4

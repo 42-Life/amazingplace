@@ -1,5 +1,5 @@
 import DateSelector from '@/components/explore/DateSelector';
-import { challengeFilterStyles as styles } from '@/constants/styles';
+import { challengeFilterStyles } from '@/constants/styles';
 import { theme } from '@/constants/theme';
 import {
     DISTANCE_OPTIONS_MILES,
@@ -12,6 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ChallengeTagPicker from '@/components/ChallengeTagPicker';
+import type { ChallengeTagId } from '@/constants/types';
 
 type Props = {
     filters: ChallengeFilters;
@@ -34,9 +36,9 @@ function Chip({label, selected, disabled, onPress}: {label: string; selected: bo
             accessibilityState={{selected, disabled: !!disabled}}
             disabled={disabled}
             onPress={onPress}
-            style={[styles.chip, selected && styles.chipSelected, disabled && styles.chipDisabled]}
+            style={[challengeFilterStyles.chip, selected && challengeFilterStyles.chipSelected, disabled && challengeFilterStyles.chipDisabled]}
         >
-            <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+            <Text style={[challengeFilterStyles.chipText, selected && challengeFilterStyles.chipTextSelected]}>{label}</Text>
         </Pressable>
     );
 }
@@ -47,6 +49,9 @@ export default function ChallengeFilterModal({filters, canFilterByDistance, onAp
     const [mediaType, setMediaType] = useState<MediaTypeFilter>(filters.mediaType);
     const [maxDistanceMiles, setMaxDistanceMiles] = useState<number | null>(filters.maxDistanceMiles);
     const [error, setError] = useState<string | null>(null);
+    const [tags, setTags] = useState<ChallengeTagId[]>(
+        filters.tags ?? []
+    );
 
     const apply = () => {
         const range = {from: from.trim(), through: through.trim()};
@@ -58,36 +63,41 @@ export default function ChallengeFilterModal({filters, canFilterByDistance, onAp
             setError('From must be on or before Through.');
             return;
         }
-        onApply({...range, mediaType, maxDistanceMiles: canFilterByDistance ? maxDistanceMiles : null});
+        onApply({...range,
+            mediaType,
+            maxDistanceMiles: canFilterByDistance ? maxDistanceMiles : null,
+            tags,
+        });
     };
 
     return (
         <Modal transparent animationType="fade" visible onRequestClose={onClose}>
-            <View style={styles.backdrop}>
-                <SafeAreaView style={styles.safe} pointerEvents="box-none">
-                    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+            <View style={challengeFilterStyles.backdrop}>
+                <SafeAreaView style={challengeFilterStyles.safe} pointerEvents="box-none">
+                    <ScrollView contentContainerStyle={challengeFilterStyles.container} keyboardShouldPersistTaps="handled">
                         <Pressable
-                            style={styles.dismissArea}
+                            style={challengeFilterStyles.dismissArea}
                             accessibilityRole="button"
                             accessibilityLabel="Close filters"
                             onPress={onClose}
                         />
-                        <View style={styles.sheet} accessibilityViewIsModal>
-                            <View style={styles.header}>
-                                <Text style={styles.title} accessibilityRole="header">Filter challenges</Text>
-                                <Pressable accessibilityRole="button" accessibilityLabel="Close filters" onPress={onClose} style={styles.close}>
+                        <View style={challengeFilterStyles.sheet} accessibilityViewIsModal>
+                            <View style={challengeFilterStyles.header}>
+                                <Text style={challengeFilterStyles.title} accessibilityRole="header">Filter challenges</Text>
+                                <Pressable accessibilityRole="button" accessibilityLabel="Close filters" onPress={onClose} style={challengeFilterStyles.close}>
                                     <Ionicons name="close-outline" size={26} color={theme.colors.text} />
                                 </Pressable>
                             </View>
 
-                            <Text style={styles.fieldLabel}>Start date from</Text>
+                            {/* Date Picker Filter*/}
+                            <Text style={challengeFilterStyles.fieldLabel}>Start date from</Text>
                             <DateSelector
                                 label="Competition start date from"
                                 value={from}
                                 maximumDate={through || undefined}
                                 onChange={(value) => {setFrom(value); setError(null);}}
                             />
-                            <Text style={styles.fieldLabel}>Start date through</Text>
+                            <Text style={challengeFilterStyles.fieldLabel}>Start date through</Text>
                             <DateSelector
                                 label="Competition start date through"
                                 value={through}
@@ -95,8 +105,17 @@ export default function ChallengeFilterModal({filters, canFilterByDistance, onAp
                                 onChange={(value) => {setThrough(value); setError(null);}}
                             />
 
-                            <Text style={styles.fieldLabel}>Submission type</Text>
-                            <View style={styles.chipRow}>
+                            {/* Tags */}
+                            <Text style={challengeFilterStyles.label}>Categories</Text>
+
+                            <ChallengeTagPicker
+                                value={tags}
+                                onChange={setTags}
+                                maxSelections={12}
+                            />
+
+                            <Text style={challengeFilterStyles.fieldLabel}>Submission type</Text>
+                            <View style={challengeFilterStyles.chipRow}>
                                 {MEDIA_OPTIONS.map((option) => (
                                     <Chip
                                         key={option.value}
@@ -107,8 +126,8 @@ export default function ChallengeFilterModal({filters, canFilterByDistance, onAp
                                 ))}
                             </View>
 
-                            <Text style={styles.fieldLabel}>Distance from Me</Text>
-                            <View style={styles.chipRow}>
+                            <Text style={challengeFilterStyles.fieldLabel}>Distance from Me</Text>
+                            <View style={challengeFilterStyles.chipRow}>
                                 <Chip
                                     label="Any"
                                     selected={maxDistanceMiles === null}
@@ -126,16 +145,16 @@ export default function ChallengeFilterModal({filters, canFilterByDistance, onAp
                                 ))}
                             </View>
                             {!canFilterByDistance && (
-                                <Text style={styles.hint}>Turn on location access to filter by distance.</Text>
+                                <Text style={challengeFilterStyles.hint}>Turn on location access to filter by distance.</Text>
                             )}
 
-                            {error && <Text style={styles.error} accessibilityRole="alert">{error}</Text>}
-                            <View style={styles.actions}>
-                                <Pressable accessibilityRole="button" onPress={() => onApply(NO_FILTERS)} style={styles.reset}>
-                                    <Text style={styles.resetText}>Reset filters</Text>
+                            {error && <Text style={challengeFilterStyles.error} accessibilityRole="alert">{error}</Text>}
+                            <View style={challengeFilterStyles.actions}>
+                                <Pressable accessibilityRole="button" onPress={() => onApply(NO_FILTERS)} style={challengeFilterStyles.reset}>
+                                    <Text style={challengeFilterStyles.resetText}>Reset filters</Text>
                                 </Pressable>
-                                <Pressable accessibilityRole="button" onPress={apply} style={styles.apply}>
-                                    <Text style={styles.applyText}>Apply filters</Text>
+                                <Pressable accessibilityRole="button" onPress={apply} style={challengeFilterStyles.apply}>
+                                    <Text style={challengeFilterStyles.applyText}>Apply filters</Text>
                                 </Pressable>
                             </View>
                         </View>

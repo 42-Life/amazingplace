@@ -6,8 +6,9 @@ import type {ChallengeLocation} from '@/constants/types';
 import {challengeListStyles as styles} from '@/constants/styles';
 import {theme} from '@/constants/theme';
 import type {ReactNode} from 'react';
+import ChallengeTagPills from '@/components/ChallengeTagPill';
 
-type ChallengeListItem = Pick<ChallengeLocation, 'id' | 'title' | 'description'>;
+type ChallengeListItem = Pick<ChallengeLocation, 'id' | 'title' | 'description' | 'tags'>;
 
 type Props<T extends ChallengeListItem> = {
     challenges: T[];
@@ -21,6 +22,7 @@ type Props<T extends ChallengeListItem> = {
     layout?: 'cards' | 'rows';
     renderDetails?: (challenge: T) => ReactNode;
 };
+
 
 export default function ChallengeList<T extends ChallengeListItem>({challenges, isLoading, errorMessage, onRetry, searchQuery, hasDateFilter = false, emptyTitle, emptyMessage, layout = 'cards', renderDetails}: Props<T>) {
     const insets = useSafeAreaInsets();   // status bar height
@@ -59,18 +61,27 @@ export default function ChallengeList<T extends ChallengeListItem>({challenges, 
                     </Text>
                 </View>
             }
-            renderItem={({item}) => (
+            renderItem={({item: challenge}) => (
                 <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`View challenge: ${item.title}`}
-                    onPress={() => router.push({pathname: '/challenge/[id]', params: {id: item.id}})}
+                    accessibilityLabel={`View challenge: ${challenge.title}`}
+                    onPress={() => router.push({pathname: '/challenge/[id]', params: {id: challenge.id}})}
                     style={({pressed}) => [layout === 'rows' ? styles.row : styles.card, pressed && styles.pressed]}
                 >
+                    {/* Title & Desctiption*/}
                     <View style={styles.cardBody}>
-                        <Text style={styles.title}>{item.title}</Text>
-                        <Text style={[styles.description, layout === 'rows' && styles.rowDescription]} numberOfLines={layout === 'rows' ? 2 : 3} ellipsizeMode="tail">{item.description}</Text>
-                        {renderDetails?.(item)}
+                        <Text style={styles.title}>{challenge.title}</Text>
+                        <Text style={[styles.description, layout === 'rows' && styles.rowDescription]} numberOfLines={layout === 'rows' ? 2 : 3} ellipsizeMode="tail">{challenge.description}</Text>
+                        {renderDetails?.(challenge)}
+                        {/* Challenge tags*/}
+                        <ChallengeTagPills
+                            tags={challenge.tags}
+                            compact
+                        />
                     </View>
+
+
+
                     {layout === 'cards' && <Ionicons name="chevron-forward" size={22} color={theme.colors.inactive} />}
                 </Pressable>
             )}

@@ -26,6 +26,7 @@ import { useChallengeEntry } from '@/hooks/use-challenge-entry';
 import { fetchChallengeById } from '@/lib/challenges';
 import { isPaidChallenge } from '@/lib/payments';
 import { formatPrice } from '@/utils/price';
+import ChallengeTagPills from '@/components/ChallengeTagPill'
 
 
 // MAIN FUNCTION
@@ -123,6 +124,7 @@ export default function ChallengeScreen() {
                         challengeId={challenge.id}
                         header={(submissionCount) => <View style={styles.details}>
                             <Text style={styles.title}>{challenge.title}</Text>
+                            <ChallengeTagPills tags={challenge.tags} />
                             <View style={styles.tagRow}>
                                 <Text style={styles.submissionTag}>{isVideoChallenge ? 'Video challenge' : 'Photo challenge'}</Text>
                                 {isPaid && (
