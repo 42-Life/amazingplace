@@ -151,8 +151,8 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
                     <MediaTypePicker value={mediaType} onChange={setMediaType} />
                     <Text style={styles.hint}>
                         {mediaType === 'video'
-                            ? 'People record a video of up to 30 seconds, with sound.'
-                            : 'People take a photo.'} This can’t be changed later.
+                            ? 'Record a video (up to 30 seconds) to enter.'
+                            : 'Upload a photo to enter.'} This can’t be changed later.
                     </Text>
 
                     <Text style={styles.label}>Description</Text>
@@ -160,7 +160,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
                         style={[styles.input, styles.inputMultiline]}
                         value={description}
                         onChangeText={setDescription}
-                        placeholder={`What should people ${captureVerb}?`}
+                        placeholder={`What should participants ${captureVerb}?`}
                         placeholderTextColor={colors.inactive}
                         multiline
                         maxLength={500}

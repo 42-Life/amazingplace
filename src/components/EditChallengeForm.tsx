@@ -133,8 +133,8 @@ const styles = StyleSheet.create({
     back: {minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center'},
     fields: {gap: 8},
     action: {flex: 0, minHeight: 48, marginTop: 16},
-    error: {color: '#B91C1C', fontSize: 14, lineHeight: 20},
-    deleteButton: {minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#B91C1C', padding: 12, marginTop: 12},
-    deleteText: {color: '#B91C1C', fontSize: 16, fontWeight: '600'},
+    error: {color: theme.colors.danger, fontSize: 14, lineHeight: 20},
+    deleteButton: {minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: theme.colors.danger, padding: 12, marginTop: 12},
+    deleteText: {color: theme.colors.danger, fontSize: 16, fontWeight: '600'},
     deleteConfirmation: {gap: 8, paddingTop: 12},
 });

@@ -1,6 +1,7 @@
 // EXPLORE SCREEN
 // Map and list of challenge locations. Tap a pin to see the challenge's details,
 // or long-press anywhere to create a new challenge on that spot.
+// Challenges can be filtered by start date, photo/video, and distance from the user.
 
 // KEY IMPORTS
 import TextInput from '@/components/KeyboardTextInput';
@@ -21,7 +22,9 @@ import { challengeMapMarkersStyles, challengeListStyles as styles } from "@/cons
 import { theme } from "@/constants/theme";
 import { ChallengeLocation } from "@/constants/types";
 import { fetchChallenges } from "@/lib/challenges";
-import { filterChallengesByStartDate, searchChallengesByName, type ChallengeStartDateFilter } from '@/lib/filter';
+// Search stays in filter.ts; the combined filters (date + photo/video + distance) live in challenge-filters.ts
+import { searchChallengesByName } from '@/lib/filter';
+import { applyChallengeFilters, countActiveFilters, NO_FILTERS, type ChallengeFilters } from '@/lib/challenge-filters';
 import { getChallengeDate } from '@/utils/challenge-dates';
 import {
     ActivityIndicator,
@@ -55,9 +58,21 @@ export default function ExploreScreen() {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchDraft, setSearchDraft] = useState('');
     const [filtersVisible, setFiltersVisible] = useState(false);
-    const [startDateFilter, setStartDateFilter] = useState<ChallengeStartDateFilter>({from: '', through: ''});
-    const activeStartDateFilter = useRef(startDateFilter);
-    const hasDateFilter = !!(startDateFilter.from || startDateFilter.through);
+
+    // FILTER STATE
+    // STEP 1: the current filter settings (dates, photo/video, distance)
+    const [filters, setFilters] = useState<ChallengeFilters>(NO_FILTERS);
+    // STEP 2: a ref copy, so async code like loadChallenges always sees the latest filters
+    const activeFilters = useRef(filters);
+    // STEP 3: how many filters are on, for the filter button's label and the "no matches" message
+    const activeFilterCount = countActiveFilters(filters);
+    const hasActiveFilters = activeFilterCount > 0;
+    // STEP 4: the user's live position (declared up here because the filters need it)
+    const [userCoordinate, setUserCoordinate] = useState<LatLng | null>(null);   // null until the first update
+    // STEP 5: ref copy of the position, for the same async reason as step 2
+    const userCoordinateRef = useRef<LatLng | null>(null);
+    useEffect(() => {userCoordinateRef.current = userCoordinate;}, [userCoordinate]);
+
     const mapRef = useRef<MapView>(null);
     const defaultChallenges = useRef<ChallengeLocation[] | null>(null);
     const defaultChallengesDate = useRef<string | null>(null);
@@ -67,10 +82,13 @@ export default function ExploreScreen() {
     // Location useStates
     const [selectedLocation, setSelectedLocation] = useState<ChallengeLocation | null>(null);
     const [locations, setLocations] = useState<ChallengeLocation[]>([]);   // empty list by default. Should pull from Supabase in actuality
-    const visibleLocations = useMemo(() => filterChallengesByStartDate(locations, startDateFilter), [locations, startDateFilter]);
+    // STEP 6: the challenges actually shown, recalculated whenever the list, filters or user position change
+    const visibleLocations = useMemo(
+        () => applyChallengeFilters(locations, filters, userCoordinate),
+        [locations, filters, userCoordinate],
+    );
     const [initialRegion, setInitialRegion] = useState<Region | null>(null);   // null until we know where to start the map
     const [hasLocationPermission, setHasLocationPermission] = useState(false); // controls the blue "you are here" dot
-    const [userCoordinate, setUserCoordinate] = useState<LatLng | null>(null);   // live position; null until the first update
 
     // Loading useStates:
     const [isLoading, setIsLoading] = useState(true);
@@ -93,12 +111,16 @@ export default function ExploreScreen() {
         mapRef.current?.animateToRegion(region, 400);
     }, []);
 
-    const applyStartDateFilter = (filter: ChallengeStartDateFilter) => {
-        activeStartDateFilter.current = filter;
-        setStartDateFilter(filter);
+    // APPLY FILTERS: runs when "Apply filters" (or "Reset filters") is pressed in the modal
+    const applyFilters = (next: ChallengeFilters) => {
+        // STEP 1: remember the new filters (state for the screen, ref for async code)
+        activeFilters.current = next;
+        setFilters(next);
+        // STEP 2: close the modal and any half-made challenge
         setFiltersVisible(false);
         setDraftCoordinate(null);
-        const matches = filterChallengesByStartDate(locations, filter);
+        // STEP 3: jump the map to the first match, or clear the selection if nothing matches
+        const matches = applyChallengeFilters(locations, next, userCoordinate);
         focusChallenge(matches[0] ?? null);
     };
 
@@ -125,8 +147,11 @@ export default function ExploreScreen() {
                         * Which gets the present location (slower)
                         * */
                         (await Location.getLastKnownPositionAsync({maxAge: 5*60*1000}))
-                            ??
+                        ??
                         (await Location.getCurrentPositionAsync({accuracy: LocationAccuracy.Balanced})); // accuracy to 100m. Use High for 10m accuracy
+
+                    // STEP 2b: save the position so distance filtering works straight away
+                    if (isMounted) setUserCoordinate(position.coords);
 
                     // STEP 3: Define area for the map to start on, now centered on the user's location
                     region = {
@@ -193,7 +218,8 @@ export default function ExploreScreen() {
             isMounted = false;
             subscription?.remove();
         }
-    }, []);
+        // Re-run when permission changes. With [] this never started, because permission is false on first render.
+    }, [hasLocationPermission]);
 
     // Load Challenge Pins from Supabase for Markers
     useEffect(() => {
@@ -220,7 +246,8 @@ export default function ExploreScreen() {
                 }
                 setLocations(challenges);
 
-                const matches = filterChallengesByStartDate(challenges, activeStartDateFilter.current);
+                // Step 3b: after loading, focus the first match under the current filters (search only)
+                const matches = applyChallengeFilters(challenges, activeFilters.current, userCoordinateRef.current);
                 if (searchQuery) focusChallenge(matches[0] ?? null);
             }
             catch (err) {
@@ -330,7 +357,7 @@ export default function ExploreScreen() {
                             accessibilityLabel={location.title}   // without this the map is unusable with a screen reader
                             style={[
                                 challengeMapMarkersStyles.dot,
-                                {backgroundColor: isLocationSelected ? colors.text : colors.active},
+                                {backgroundColor: isLocationSelected ? colors.active : colors.challengeMarker}, // orange when selected; teal otherwise
                                 isLocationSelected && challengeMapMarkersStyles.dotSelected
                             ]}
                         />
@@ -358,19 +385,22 @@ export default function ExploreScreen() {
         )
     }
 
+    // SCREEN LAYOUT
     return(
         <SafeAreaView style={styles.fill} edges={['left', 'right']}>
             <View style={styles.fill}>
+                {/* STEP 1: list view, using the combined "any filter on" flag for its empty message */}
                 {viewMode === 'list' && (
                     <ChallengeList
                         challenges={visibleLocations}
-                        hasDateFilter={hasDateFilter}
+                        hasDateFilter={hasActiveFilters}
                         searchQuery={searchQuery}
                         isLoading={isLoading}
                         errorMessage={errorMessage}
                         onRetry={refreshChallenges}
                     />
                 )}
+                {/* STEP 2: map view */}
                 {viewMode === 'map' && <View style={styles.fill}>
                     {initialRegion ? (
                         <MapView
@@ -386,10 +416,10 @@ export default function ExploreScreen() {
                             showsMyLocationButton={hasLocationPermission}
                             mapPadding={{top: insets.top + 80, right: 0, bottom: 0, left: 0}}
                         >
-                            {/* STEP 1: Show all location markers, orange*/}
+                            {/* 2a: Show all location markers that pass the filters, orange*/}
                             {SetMarkers(visibleLocations, selectedLocation)}
 
-                            {/* Pin dropped where the user long-pressed, until they save or cancel */}
+                            {/* 2b: Pin dropped where the user long-pressed, until they save or cancel */}
                             {draftCoordinate && (
                                 <Marker coordinate={draftCoordinate} anchor={{x: 0.5, y: 1}} tracksViewChanges>
                                     <View collapsable={false} accessibilityLabel="New challenge location">
@@ -403,6 +433,8 @@ export default function ExploreScreen() {
                         DisplayChallengeInfoCard() // Displays Challenge information conditionally, ie if a location has been selected
                     }
                 </View>}
+
+                {/* STEP 3: floating search bar */}
                 <View style={[styles.searchBar, {top: insets.top + 16}]}>
                     <Ionicons name="search-outline" size={22} color={colors.inactive} />
                     <TextInput
@@ -429,15 +461,19 @@ export default function ExploreScreen() {
                         </Pressable>
                     )}
                 </View>
+
+                {/* STEP 4: filter button, with the number of active filters in its label */}
                 <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={hasDateFilter ? 'Filters, start date filter applied' : 'Filters'}
+                    accessibilityLabel={hasActiveFilters ? `Filters, ${activeFilterCount} applied` : 'Filters'}
                     accessibilityState={{expanded: filtersVisible}}
                     onPress={() => {Keyboard.dismiss(); setFiltersVisible(true);}}
-                    style={({pressed}) => [styles.toggleButton, {top: insets.top + 16}, styles.filterButton, hasDateFilter && styles.filterActive, pressed && styles.pressed]}
+                    style={({pressed}) => [styles.toggleButton, {top: insets.top + 16}, styles.filterButton, hasActiveFilters && styles.filterActive, pressed && styles.pressed]}
                 >
-                    <Ionicons name={hasDateFilter ? 'funnel' : 'funnel-outline'} size={24} color={hasDateFilter ? colors.background : colors.text} />
+                    <Ionicons name={hasActiveFilters ? 'funnel' : 'funnel-outline'} size={24} color={hasActiveFilters ? colors.background : colors.text} />
                 </Pressable>
+
+                {/* STEP 5: refresh button */}
                 <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Refresh challenges"
@@ -450,6 +486,8 @@ export default function ExploreScreen() {
                         ? <ActivityIndicator color={colors.text} accessibilityLabel="Refreshing challenges" />
                         : <Ionicons name="refresh-outline" size={24} color={colors.text} />}
                 </Pressable>
+
+                {/* STEP 6: map/list toggle button */}
                 <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={viewMode === 'map' ? 'Switch to list view' : 'Switch to map view'}
@@ -462,12 +500,14 @@ export default function ExploreScreen() {
                         color={colors.text}
                     />
                 </Pressable>
+
+                {/* STEP 7: "Clear search" button, only while a search is active */}
                 {searchQuery.length > 0 && (
                     <View pointerEvents="box-none" style={[styles.clearResultsRow, {top: insets.top + 80}]}>
                         <Pressable
                             accessibilityRole="button"
-                            accessibilityLabel={hasDateFilter ? 'Clear search and keep date filters' : 'Clear search and show all challenges'}
-                                    onPress={clearSearchResults}
+                            accessibilityLabel={hasActiveFilters ? 'Clear search and keep filters' : 'Clear search and show all challenges'}
+                            onPress={clearSearchResults}
                             style={({pressed}) => [styles.clearResultsButton, pressed && styles.pressed]}
                         >
                             {/* <Ionicons name="close-outline" size={20} color={colors.text} /> */}
@@ -476,7 +516,8 @@ export default function ExploreScreen() {
                     </View>
                 )}
             </View>
-            {/* CREATE CHALLENGE FORM: opened by a long press, with that spot already chosen */}
+
+            {/* STEP 8: CREATE CHALLENGE FORM: opened by a long press, with that spot already chosen */}
             {draftCoordinate && (
                 <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={cancelDraft}>
                     <CreateChallengeForm
@@ -486,10 +527,13 @@ export default function ExploreScreen() {
                     />
                 </Modal>
             )}
+
+            {/* STEP 9: FILTER MODAL: told whether distance filtering is possible (needs the user's location) */}
             {filtersVisible && (
                 <ChallengeFilterModal
-                    filters={startDateFilter}
-                    onApply={applyStartDateFilter}
+                    filters={filters}
+                    canFilterByDistance={userCoordinate !== null}
+                    onApply={applyFilters}
                     onClose={() => setFiltersVisible(false)}
                 />
             )}

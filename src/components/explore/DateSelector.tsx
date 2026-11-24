@@ -62,7 +62,7 @@ export default function DateSelector({label, value, onChange, minimumDate, maxim
                         display={Platform.OS === 'ios' ? 'inline' : 'default'}
                         presentation="dialog"
                         themeVariant="light"
-                        accentColor={theme.colors.active}
+                        accentColor={theme.colors.activePressed}
                         minimumDate={minimumDate ? toLocalDate(minimumDate) : undefined}
                         maximumDate={maximumDate ? toLocalDate(maximumDate) : undefined}
                         onValueChange={(_event, date) => {
