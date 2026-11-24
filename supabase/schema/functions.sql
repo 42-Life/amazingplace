@@ -28,14 +28,16 @@ grant all on function public.current_account_id() to anon, authenticated, servic
 grant all on function public.handle_new_user() to anon, authenticated, service_role;
 
 -- Enforce edit rules on the server too, including when a form stays open overnight.
+-- The entry fee is fixed at creation, like the radius and media type. Letting a creator
+-- raise it afterwards would change the deal for everyone who already paid to get in.
+-- (Keep comments out of the function body: the body must match the migration exactly,
+-- or the next declarative sync re-creates the function for no reason.)
 create or replace function public.validate_challenge_edit()
 returns trigger
 language plpgsql
 set search_path to 'public'
 as $$
 begin
-    -- The entry fee is fixed at creation, like the radius and media type. Letting a creator
-    -- raise it afterwards would change the deal for everyone who already paid to get in.
     if new.id is distinct from old.id
        or new.created_at is distinct from old.created_at
        or new.radius_m is distinct from old.radius_m
@@ -125,6 +127,48 @@ begin
     select media_type into challenge_media_type from public.challenges where id = new.challenge_id;
     if challenge_media_type is not null and new.media_type is distinct from challenge_media_type then
         raise exception 'This challenge only accepts % submissions.', challenge_media_type;
+    end if;
+    return new;
+end;
+$$;
+
+-- A vote can only switch submissions within the same challenge.
+-- Row level security can't compare old and new values, so a trigger does it.
+create or replace function public.validate_vote_update()
+returns trigger
+language plpgsql
+set search_path to 'public'
+as $$
+begin
+    if new.account_id <> old.account_id then
+        raise exception 'A vote''s account can''t be changed.';
+    end if;
+    if new.challenge_id <> old.challenge_id then
+        raise exception 'A vote can''t be moved to another challenge.';
+    end if;
+    return new;
+end;
+$$;
+
+-- Editing a comment may only change its text.
+-- Row level security can't compare old and new values, so a trigger does it.
+-- It also stamps edited_at itself, so the app can't fake or skip the "edited" mark.
+create or replace function public.validate_comment_update()
+returns trigger
+language plpgsql
+set search_path to 'public'
+as $$
+begin
+    if new.id <> old.id
+       or new.account_id <> old.account_id
+       or new.submission_id <> old.submission_id
+       or new.created_at <> old.created_at then
+        raise exception 'Only a comment''s text can be changed.';
+    end if;
+    if new.body is distinct from old.body then
+        new.edited_at := now();
+    else
+        new.edited_at := old.edited_at;
     end if;
     return new;
 end;
