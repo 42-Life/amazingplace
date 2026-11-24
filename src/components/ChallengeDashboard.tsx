@@ -7,7 +7,7 @@ import {fetchCreatedChallenges} from '@/lib/challenges';
 import type {ChallengeLocation} from '@/constants/types';
 import {theme} from '@/constants/theme';
 import {challengeListStyles as listStyles} from '@/constants/styles';
-import {getChallengeDate} from '@/utils/challenge-dates';
+import {CHALLENGE_PHASE_LABELS, describeChallengePhase, getChallengeDate, getChallengePhase} from '@/utils/challenge-dates';
 
 export default function ChallengeDashboard() {
     const [revision, setRevision] = useState(0);
@@ -69,7 +69,7 @@ function DashboardList({onRetry}: {onRetry: () => void}) {
                     <View style={listStyles.cardBody}>
                         <Text style={listStyles.title}>{item.title}</Text>
                         <Text style={listStyles.description} numberOfLines={2} ellipsizeMode="tail">{item.description}</Text>
-                        <Text style={styles.hint}>{item.end_at < today ? 'Ended' : item.start_at > today ? 'Upcoming' : 'Active'} · Ends {new Date(`${item.end_at}T12:00:00`).toLocaleDateString()}</Text>
+                        <Text style={styles.hint}>{CHALLENGE_PHASE_LABELS[getChallengePhase(item, today)]} · {describeChallengePhase(item, today)}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={22} color={theme.colors.inactive} />
                 </Pressable>

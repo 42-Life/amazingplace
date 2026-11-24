@@ -5,7 +5,7 @@
 import { supabase } from '@/lib/supabase';
 import { fetchMyAccount } from '@/lib/accounts';
 import { fetchAllRows } from '@/lib/fetch-all-rows';
-import {getChallengeDate} from '@/utils/challenge-dates';
+import {formatChallengeDate, getChallengeDate, getChallengePhase} from '@/utils/challenge-dates';
 import {distanceInMeters} from '@/utils/distance';
 import {getVideoFile, isValidVideoDuration, MAX_VIDEO_BYTES} from '@/utils/media';
 import type {ChallengeLocation, MediaType, PhotoLocation} from '@/constants/types';
@@ -70,8 +70,12 @@ export async function uploadSubmission(
     const challengeId = challenge.id;
     const {mediaType, uri} = capture;
 
-    // STEP 0: Stop before uploading anything if the challenge wants the other kind of entry,
-    //   or if it was taken outside the challenge area. The database checks the type too.
+    // STEP 0: Stop before uploading anything if entries aren't open (e.g. the camera stayed open past midnight
+    //   on the last day), if the challenge wants the other kind of entry, or if it was taken outside the
+    //   challenge area. The database checks the dates and the type too.
+    const phase = getChallengePhase(challenge);
+    if (phase === 'upcoming') throw new SubmissionError(`Entries open on ${formatChallengeDate(challenge.start_at)}.`);
+    if (phase !== 'entry') throw new SubmissionError(`Entries closed on ${formatChallengeDate(challenge.end_at)}.`);
     if (mediaType !== challenge.media_type) {
         throw new SubmissionError(`This challenge only accepts ${challenge.media_type}s.`);
     }
@@ -189,13 +193,17 @@ export async function fetchChallengeSubmissions(challengeId: string): Promise<{p
 // FETCH ONE SUBMISSION
 // The submission shown on the submission page, or null if it has been deleted.
 // Includes its challenge, which voting needs (a vote is one per account per challenge).
-export type SubmissionDetail = SubmissionPhoto & {challengeId: string};
+// challengeSchedule: the challenge's dates, so the submission page knows whether voting is open
+export type SubmissionDetail = SubmissionPhoto & {
+    challengeId: string;
+    challengeSchedule: Pick<ChallengeLocation, 'start_at' | 'end_at' | 'voting_end_at'>;
+};
 
 export async function fetchSubmissionById(submissionId: string): Promise<SubmissionDetail | null> {
     const account = await fetchMyAccount();
     const {data: row, error} = await supabase
         .from('submissions')
-        .select('id, challenge_id, image_path, media_type, duration_ms, created_at, account_id, accounts(username)')
+        .select('id, challenge_id, image_path, media_type, duration_ms, created_at, account_id, accounts(username), challenges(start_at, end_at, voting_end_at)')
         .eq('id', submissionId)
         .maybeSingle()
         .overrideTypes<{
@@ -207,12 +215,14 @@ export async function fetchSubmissionById(submissionId: string): Promise<Submiss
             created_at: string;
             account_id: string;
             accounts: {username: string} | null;
+            challenges: Pick<ChallengeLocation, 'start_at' | 'end_at' | 'voting_end_at'>;
         }, {merge: false}>();
     if (error) throw error;
     if (!row) return null;
     return {
         id: row.id,
         challengeId: row.challenge_id,
+        challengeSchedule: row.challenges,
         imageUrl: getMediaUrl(row.media_type, row.image_path),
         mediaType: row.media_type,
         durationMs: row.duration_ms,
@@ -274,7 +284,7 @@ export async function fetchMySubmissions(): Promise<Submission[]> {
     const {data, error} = await supabase
         .from('submissions')
         .select('id, image_path, media_type, duration_ms, created_at, challenges!inner(title)')
-        .gte('challenges.end_at', getChallengeDate())
+        .gte('challenges.voting_end_at', getChallengeDate())
         .eq('account_id', account.id)
         .order('created_at', {ascending: false});
 

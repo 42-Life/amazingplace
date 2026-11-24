@@ -544,6 +544,9 @@ export const challengeDetailStyles = StyleSheet.create({
     paymentError: {fontSize: 14, color: '#B91C1C'},
     paymentNote: {fontSize: 13, color: colors.inactive, textAlign: 'center'},
 
+    // Shown in place of the enter button outside the entry period (e.g. "Entries are closed. Voting ends Dec 10")
+    phaseNote: {fontSize: 15, lineHeight: 21, color: colors.text, textAlign: 'center', paddingVertical: 8},
+
     // Back button row across the top
     header: {
         flexDirection: 'row',

@@ -34,6 +34,7 @@ create policy "Signed-in users can view submissions"
     to authenticated
     using (true);
 
+-- Submissions are only accepted during the entry period (see challenge_phase in functions.sql).
 -- Paid challenges only accept submissions from people who paid (and from the creator).
 -- Free challenges are unaffected: has_challenge_access returns true for them.
 create policy "users insert their own submissions"
@@ -42,6 +43,7 @@ create policy "users insert their own submissions"
     with check (
         account_id = public.current_account_id()
         and public.has_challenge_access(challenge_id, public.current_account_id())
+        and public.challenge_phase(challenge_id) = 'entry'
     );
 
 create policy "users delete their own submissions"

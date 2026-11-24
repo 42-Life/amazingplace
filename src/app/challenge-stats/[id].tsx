@@ -14,7 +14,7 @@ import SubmissionsTimeline from '@/components/stats/SubmissionsTimeline';
 import TopSubmissions from '@/components/stats/TopSubmissions';
 import {theme} from '@/constants/theme';
 import {fetchChallengeStats, type ChallengeStats} from '@/lib/challenge-stats';
-import {getChallengeDate} from '@/utils/challenge-dates';
+import {CHALLENGE_PHASE_LABELS, getChallengeDate, getChallengePhase} from '@/utils/challenge-dates';
 
 const formatDay = (date: string) =>
     new Date(`${date}T12:00:00`).toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'});
@@ -98,7 +98,7 @@ export default function ChallengeStatsScreen() {
 function StatsBody({stats}: {stats: ChallengeStats}) {
     const {challenge, totals, topSubmissions, timeline} = stats;
     const today = getChallengeDate();
-    const status = challenge.end_at < today ? 'Ended' : challenge.start_at > today ? 'Upcoming' : 'Active';
+    const status = CHALLENGE_PHASE_LABELS[getChallengePhase(challenge, today)];
     const hasStarted = timeline.buckets.length > 0;
 
     return (
@@ -107,7 +107,7 @@ function StatsBody({stats}: {stats: ChallengeStats}) {
             <View style={styles.titleBlock}>
                 <Text style={styles.title}>{challenge.title}</Text>
                 <Text style={styles.hint}>
-                    {status} · {formatDay(challenge.start_at)} – {formatDay(challenge.end_at)}
+                    {status} · Entries {formatDay(challenge.start_at)} – {formatDay(challenge.end_at)} · Voting until {formatDay(challenge.voting_end_at)}
                 </Text>
             </View>
 

@@ -6,7 +6,7 @@ import TextInput from '@/components/KeyboardTextInput';
 import DateSelector from '@/components/explore/DateSelector';
 import ChallengeAreaMap from '@/components/ChallengeAreaMap';
 import {deleteChallenge, updateChallenge} from '@/lib/challenges';
-import {getChallengeDate} from '@/utils/challenge-dates';
+import {DEFAULT_VOTING_DAYS, addDays, formatChallengeDate, getChallengeDate, getVotingStartDate} from '@/utils/challenge-dates';
 import type {ChallengeLocation, ChallengeTagId} from '@/constants/types';
 import {createChallengeStyles as formStyles} from '@/constants/styles';
 import {theme} from '@/constants/theme';
@@ -19,6 +19,7 @@ export default function EditChallengeForm({challenge, onClose, onDeleted}: {chal
     const [description, setDescription] = useState(challenge.description ?? '');
     const [startAt, setStartAt] = useState(challenge.start_at);
     const [endAt, setEndAt] = useState(challenge.end_at);
+    const [votingEndAt, setVotingEndAt] = useState(challenge.voting_end_at);
     const [latitude, setLatitude] = useState(String(challenge.latitude));
     const [longitude, setLongitude] = useState(String(challenge.longitude));
     const [busy, setBusy] = useState(false);
@@ -33,6 +34,18 @@ export default function EditChallengeForm({challenge, onClose, onDeleted}: {chal
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const minimumEnd = startAt > getChallengeDate(tomorrow) ? startAt : getChallengeDate(tomorrow);
+    // Each end date locks once its period is over (the database enforces this too)
+    const canChangeEnd = challenge.end_at >= today;
+    const canChangeVotingEnd = challenge.voting_end_at >= today;
+    // Voting starts the day after entries close, and can't be moved to end in the past
+    const votingStart = getVotingStartDate({end_at: endAt});
+    const minimumVotingEnd = votingStart > today ? votingStart : today;
+
+    // Moving the entry end date past the voting end date pushes voting back to keep its default length
+    const changeEndAt = (value: string) => {
+        setEndAt(value);
+        if (value && votingEndAt <= value) setVotingEndAt(addDays(value, DEFAULT_VOTING_DAYS));
+    };
     const coordinate = {latitude: Number(latitude), longitude: Number(longitude)};
     const validCoordinate = latitude.trim() !== '' && longitude.trim() !== ''
         && Number.isFinite(coordinate.latitude) && Math.abs(coordinate.latitude) <= 90
@@ -48,7 +61,9 @@ export default function EditChallengeForm({challenge, onClose, onDeleted}: {chal
         setBusy(true);
         try {
             await updateChallenge(challenge.id, {
-                title, description, end_at: endAt, tags,
+                title, description, tags,
+                ...(canChangeEnd ? {end_at: endAt} : {}),
+                ...(canChangeVotingEnd ? {voting_end_at: votingEndAt} : {}),
                 ...(canChangeStartAndLocation ? {start_at: startAt, ...coordinate} : {}),
             });
             onClose();
@@ -106,9 +121,23 @@ export default function EditChallengeForm({challenge, onClose, onDeleted}: {chal
                         {canChangeStartAndLocation
                             ? <DateSelector label="Start date" value={startAt} onChange={setStartAt} minimumDate={today} />
                             : <Text style={formStyles.reviewValue}>{new Date(`${startAt}T12:00:00`).toLocaleDateString()}</Text>}
-                        <Text style={formStyles.label}>End date</Text>
-                        <DateSelector label="End date" value={endAt} onChange={setEndAt} minimumDate={minimumEnd} />
-                        <Text style={formStyles.hint}>A changed end date must be after today and on or after the start date.</Text>
+                        <Text style={formStyles.label}>Entries close</Text>
+                        {canChangeEnd ? <>
+                            <DateSelector label="Entries close" value={endAt} onChange={changeEndAt} minimumDate={minimumEnd} />
+                            <Text style={formStyles.hint}>A changed end date must be after today and on or after the start date.</Text>
+                        </> : <>
+                            <Text style={formStyles.reviewValue}>{formatChallengeDate(endAt)}</Text>
+                            <Text style={formStyles.hint}>Entries have closed, so this date is locked.</Text>
+                        </>}
+
+                        <Text style={formStyles.label}>Voting ends</Text>
+                        {canChangeVotingEnd ? <>
+                            <DateSelector label="Voting ends" value={votingEndAt} onChange={setVotingEndAt} minimumDate={minimumVotingEnd} />
+                            <Text style={formStyles.hint}>Voting opens {formatChallengeDate(votingStart)}, the day after entries close.</Text>
+                        </> : <>
+                            <Text style={formStyles.reviewValue}>{formatChallengeDate(votingEndAt)}</Text>
+                            <Text style={formStyles.hint}>Voting has closed, so this date is locked.</Text>
+                        </>}
 
                         <Text style={formStyles.label}>Location</Text>
                         {!canChangeStartAndLocation && <Text style={formStyles.hint}>The challenge has begun. Its start date and location are locked.</Text>}
