@@ -2,22 +2,25 @@
 // One submission on its own page: the photo (or video) filling the screen at the top,
 // and its comments underneath. Opened by tapping a submission on a challenge page.
 //
-// The photo can be pinched or double-tapped to zoom. Comments load a page at a time,
+// The photo can be pinched to zoom, and double-tapped to vote. Comments load a page at a time,
 // with more fetched as the user nears the bottom, so the list can go on as long as it needs to.
+// The box pinned to the bottom writes a new comment, or edits one of the user's own.
 
 // KEY IMPORTS
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions} from 'react-native';
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {Ionicons} from '@expo/vector-icons';
 import {router, useLocalSearchParams} from 'expo-router';
 // Internal imports
+import CommentComposer from '@/components/comments/CommentComposer';
+import CommentItem from '@/components/comments/CommentItem';
 import ZoomableImage from '@/components/capture/ZoomableImage';
 import SubmissionVideo from '@/components/capture/SubmissionVideo';
 import {theme} from '@/constants/theme';
 import type {Comment} from '@/constants/types';
-import {fetchCommentsPage} from '@/lib/comments';
+import {createComment, deleteComment, fetchCommentsPage, updateComment} from '@/lib/comments';
 import {fetchSubmissionById, type SubmissionDetail} from '@/lib/photos';
 import {fetchChallengeVotes, removeVote, submitVote, updateVote, type ChallengeVotes} from '@/lib/voting';
 
@@ -29,14 +32,16 @@ const COMMENTS_PER_PAGE = 20;
 //   done: every comment is on screen                       error: the last fetch failed
 type CommentsStatus = 'idle' | 'loading' | 'done' | 'error';
 
-const formatDate = (iso: string) =>
-    new Date(iso).toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'});
+// Oldest first, the order the database pages them in. Sorting here keeps a comment the user
+// just posted in its place when older pages are loaded in after it.
+const byAge = (a: Comment, b: Comment) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
 
 
 // MAIN FUNCTION
 export default function SubmissionScreen() {
     const {colors} = theme;
     const {width, height: windowHeight} = useWindowDimensions();
+    const insets = useSafeAreaInsets();
 
     // The id from the route, e.g. /submission/3f2a...
     const {id} = useLocalSearchParams<{id: string}>();
@@ -52,6 +57,13 @@ export default function SubmissionScreen() {
     const isFetchingComments = useRef(false);
     const loadedCount = useRef(0);
     const hasMoreComments = useRef(true);
+    // Comments posted from this screen that paging hasn't reached yet (see removeComment)
+    const postedHere = useRef(new Set<string>());
+    const listRef = useRef<FlatList<Comment>>(null);
+
+    // The comment open in the composer for editing, and the ones being deleted right now
+    const [editing, setEditing] = useState<Comment | null>(null);
+    const [deletingIds, setDeletingIds] = useState<string[]>([]);
 
     // While the photo is zoomed, a drag moves the photo, so the page must not scroll under it
     const [isZoomed, setIsZoomed] = useState(false);
@@ -120,10 +132,12 @@ export default function SubmissionScreen() {
             const page = await fetchCommentsPage(id, loadedCount.current, COMMENTS_PER_PAGE);
             loadedCount.current += page.length;
             hasMoreComments.current = page.length === COMMENTS_PER_PAGE;
-            // Skip any comment already on screen (a deleted comment shifts the pages by one)
+            // Paging has now reached these, so they count as loaded like any other
+            page.forEach((comment) => postedHere.current.delete(comment.id));
+            // Skip any comment already on screen (one the user just posted, for example)
             setComments((current) => {
                 const seen = new Set(current.map((comment) => comment.id));
-                return [...current, ...page.filter((comment) => !seen.has(comment.id))];
+                return [...current, ...page.filter((comment) => !seen.has(comment.id))].sort(byAge);
             });
             setCommentsStatus(hasMoreComments.current ? 'idle' : 'done');
         } catch (err) {
@@ -163,13 +177,58 @@ export default function SubmissionScreen() {
         return () => { isMounted = false; };
     }, [id, loadMoreComments]);
 
+    // KEY HANDLER: THE COMPOSER'S BUTTON
+    //   Saves an edit if a comment is open for editing, otherwise posts a new comment.
+    //   Errors are left to throw: the composer shows them and keeps the text.
+    async function submitComment(text: string) {
+        if (editing) {
+            const updated = await updateComment(editing.id, text);
+            setComments((current) => current.map((comment) => comment.id === updated.id ? updated : comment));
+            setEditing(null);
+            return;
+        }
+        const created = await createComment(id, text);
+        // If older pages are still to come, paging hasn't counted this one yet
+        if (hasMoreComments.current) postedHere.current.add(created.id);
+        setComments((current) => [...current, created].sort(byAge));
+        // Show the user their comment: it is the newest, so it is at the bottom
+        setTimeout(() => listRef.current?.scrollToEnd({animated: true}), 100);
+    }
+
+    // KEY HANDLER: DELETE BUTTON ON A COMMENT
+    //   Asks first, because a deleted comment can't be brought back.
+    function confirmDeleteComment(comment: Comment) {
+        Alert.alert('Delete comment?', 'This can’t be undone.', [
+            {text: 'Cancel', style: 'cancel'},
+            {text: 'Delete', style: 'destructive', onPress: () => removeComment(comment)},
+        ]);
+    }
+
+    async function removeComment(comment: Comment) {
+        setDeletingIds((current) => [...current, comment.id]);
+        try {
+            await deleteComment(comment.id);
+            setComments((current) => current.filter((item) => item.id !== comment.id));
+            if (editing?.id === comment.id) setEditing(null);
+            // One fewer row in the database means the next page starts one row earlier,
+            // unless this comment was never counted as loaded in the first place
+            if (!postedHere.current.delete(comment.id)) loadedCount.current = Math.max(loadedCount.current - 1, 0);
+        } catch (err: any) {
+            Alert.alert('Could not delete comment', err?.message ?? 'Something went wrong. Please try again.');
+        } finally {
+            setDeletingIds((current) => current.filter((item) => item !== comment.id));
+        }
+    }
+
     // TOP OF THE LIST: the photo or video, then the "Comments" heading
     //   Photos get a stage as tall as the page, like the old full-screen viewer.
     //   Videos get a box no taller than 60% of the screen, so the comments stay within reach
+    const isVideo = submission?.mediaType === 'video';
+    const mediaHeight = isVideo ? Math.min(width * 4 / 3, windowHeight * 0.6) : listHeight;
     const media = submission ? (
         <View>
-            {submission.mediaType === 'video'
-                ? <SubmissionVideo videoUrl={submission.imageUrl} width={width} height={Math.min(width * 4 / 3, windowHeight * 0.6)} />
+            {isVideo
+                ? <SubmissionVideo videoUrl={submission.imageUrl} width={width} height={mediaHeight} />
                 : <ZoomableImage key={`${width}:${listHeight}`} imageUrl={submission.imageUrl} width={width} height={listHeight} onZoomChange={setIsZoomed} onDoubleTap={castVote} />}
             {/* "Comments" on the left, the vote count on the right, each set in by the same amount */}
             <View style={styles.headingRow}>
@@ -227,28 +286,46 @@ export default function SubmissionScreen() {
                 ) : errorMessage ? (
                     <View style={styles.centered}><Text style={styles.message}>{errorMessage}</Text></View>
                 ) : (
-                    <View style={styles.fill} onLayout={({nativeEvent: {layout}}) => setListHeight(layout.height)}>
+                    // Lifts the composer above the keyboard (iOS; Android resizes the window itself)
+                    <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+                    {/* Only ever grows: the keyboard shrinks this area, and the photo's stage must not shrink with it */}
+                    <View style={styles.fill} onLayout={({nativeEvent: {layout}}) => setListHeight((current) => Math.max(current, layout.height))}>
                     {listHeight > 0 && <FlatList
+                        ref={listRef}
                         data={comments}
+                        // Scrolling puts the keyboard away; tapping Edit or Delete works while it is up
+                        keyboardDismissMode="on-drag"
+                        keyboardShouldPersistTaps="handled"
                         keyExtractor={(comment) => comment.id}
                         scrollEnabled={!isZoomed}
                         ListHeaderComponent={media}
                         ListFooterComponent={footer}
-                        contentContainerStyle={styles.content}
+                        // The comments section is always at least half a screen tall, however few
+                        // comments there are, so scrolling down always opens up some room for them.
+                        contentContainerStyle={[styles.content, {minHeight: mediaHeight + listHeight / 2}]}
                         // Fetch the next page when the user is within half a screen of the bottom
                         onEndReached={loadMoreComments}
                         onEndReachedThreshold={0.5}
                         renderItem={({item}) => (
-                            <View style={styles.comment}>
-                                <View style={styles.commentTop}>
-                                    <Text style={styles.username} numberOfLines={1}>@{item.username}</Text>
-                                    <Text style={styles.date}>{formatDate(item.createdAt)}{item.editedAt ? ' · edited' : ''}</Text>
-                                </View>
-                                <Text style={styles.body}>{item.body}</Text>
-                            </View>
+                            <CommentItem
+                                comment={item}
+                                isEditing={editing?.id === item.id}
+                                isDeleting={deletingIds.includes(item.id)}
+                                onEdit={setEditing}
+                                onDelete={confirmDeleteComment}
+                            />
                         )}
                     />}
                     </View>
+                    {/* 3. Composer: pinned under the list. A new key resets its text box when edit mode changes */}
+                    <CommentComposer
+                        key={editing?.id ?? 'new'}
+                        editing={editing}
+                        onSubmit={submitComment}
+                        onCancelEdit={() => setEditing(null)}
+                        bottomInset={insets.bottom}
+                    />
+                    </KeyboardAvoidingView>
                 )}
             </SafeAreaView>
         </GestureHandlerRootView>
@@ -267,11 +344,6 @@ const styles = StyleSheet.create({
     // Same look and size as the badge on the grid's tiles (see PhotoGrid)
     voteBadge: {paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, backgroundColor: 'rgba(0, 0, 0, 0.55)'},
     voteText: {fontSize: 13, fontWeight: '600', color: '#FFFFFF'},
-    comment: {paddingHorizontal: 20, paddingVertical: 12, gap: 4, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.tabBarBorder},
-    commentTop: {flexDirection: 'row', alignItems: 'baseline', gap: 8},
-    username: {flexShrink: 1, fontSize: 15, fontWeight: '700', color: theme.colors.text},
-    date: {fontSize: 13, color: theme.colors.inactive},
-    body: {fontSize: 15, lineHeight: 21, color: theme.colors.text},
     status: {alignItems: 'center', paddingVertical: 16, gap: 8},
     message: {color: theme.colors.inactive, fontSize: 15},
     retry: {minHeight: 44, justifyContent: 'center', paddingHorizontal: 16},
