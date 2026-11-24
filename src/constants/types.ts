@@ -81,6 +81,18 @@ export type Vote = {
     created_at: string
 }
 
+// One comment under a submission, ready to display
+export type Comment = {
+    id: string
+    accountId: string
+    submissionId: string
+    body: string
+    createdAt: string
+    editedAt: string | null   // null if the text was never changed
+    username: string          // who wrote it
+    isOwn: boolean            // written by the signed-in user, so they may edit or delete it
+}
+
 // Challenge Tags
 export type ChallengeTagId =
     | 'pranks_humor'
