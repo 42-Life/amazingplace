@@ -34,7 +34,8 @@ export type ChallengeLocation = {
     latitude: number
     longitude: number
     start_at: string
-    end_at: string          // last day of the challenge, YYYY-MM-DD
+    end_at: string          // last day of the entry period, YYYY-MM-DD
+    voting_end_at: string   // last day of the voting period, YYYY-MM-DD (voting starts the day after end_at)
     radius_m: number        // photos and videos must be taken within this many meters of the pin
     media_type: MediaType   // whether entries are photos or videos
     tags: ChallengeTagId[]

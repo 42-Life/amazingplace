@@ -22,7 +22,7 @@ import ChallengeAreaMap, {formatRadius} from '@/components/ChallengeAreaMap';
 import MediaTypePicker from '@/components/MediaTypePicker';
 import ChallengeTagPicker from '@/components/ChallengeTagPicker';
 import {ChallengeTags} from '@/components/ChallengeTags';
-import {getChallengeDate} from '@/utils/challenge-dates';
+import {DEFAULT_VOTING_DAYS, addDays, getChallengeDate, getVotingStartDate} from '@/utils/challenge-dates';
 import type {ChallengeLocation, ChallengeTagId, MediaType} from '@/constants/types';
 
 // Where the map starts on step 2: BU College of Arts and Sciences
@@ -70,7 +70,8 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
     const [coordinate, setCoordinate] = useState(startCoordinate);   // the spot under the pin
     const [radiusM, setRadiusM] = useState(DEFAULT_RADIUS_M);        // entries must be taken within this many meters of the pin
     const [startAt, setStartAt] = useState(getChallengeDate());      // first day of the challenge, YYYY-MM-DD (starts as today)
-    const [endAt, setEndAt] = useState('');                         // last day of the challenge, YYYY-MM-DD ('' = not picked yet)
+    const [endAt, setEndAt] = useState('');                         // last day of entries, YYYY-MM-DD ('' = not picked yet)
+    const [votingEndAt, setVotingEndAt] = useState('');              // last day of voting, YYYY-MM-DD ('' = not picked yet)
     const [isSubmitting, setIsSubmitting] = useState(false);         // true while saving; blocks double submits
 
     // ENTRY FEE
@@ -83,13 +84,24 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
         : priceCents > MAX_PRICE_CENTS ? `A challenge can't cost more than ${formatPrice(MAX_PRICE_CENTS)}.`
         : null;
 
-    // Step 1 is only done once both fields have text, a category is picked, both dates are picked, and the fee is usable
-    const isDetailsValid = title.trim().length > 0 && description.trim().length > 0 && tags.length > 0 && startAt !== '' && endAt !== '' && priceError === null;
+    // Step 1 is only done once both fields have text, a category is picked, all three dates are picked, and the fee is usable
+    const isDetailsValid = title.trim().length > 0 && description.trim().length > 0 && tags.length > 0
+        && startAt !== '' && endAt !== '' && votingEndAt !== '' && priceError === null;
 
-    // Changing the start date clears an end date that would now come before it
+    // Changing the start date clears end dates that would now come before it
     const changeStartAt = (value: string) => {
         setStartAt(value);
-        if (endAt && value && endAt < value) setEndAt('');
+        if (endAt && value && endAt < value) {
+            setEndAt('');
+            setVotingEndAt('');
+        }
+    }
+
+    // Picking when entries close also picks when voting ends (DEFAULT_VOTING_DAYS later),
+    //   unless the user already chose a voting end date that still comes after it
+    const changeEndAt = (value: string) => {
+        setEndAt(value);
+        if (value && (!votingEndAt || votingEndAt <= value)) setVotingEndAt(addDays(value, DEFAULT_VOTING_DAYS));
     }
     const canGoNext = step === 1 ? isDetailsValid : true;
 
@@ -109,6 +121,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
         setRadiusM(DEFAULT_RADIUS_M);
         setStartAt(getChallengeDate());
         setEndAt('');
+        setVotingEndAt('');
     }
 
     // Back to a blank form, unless the caller wants to take over
@@ -124,7 +137,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
         try {
             // STEP 1: Save the challenge
             //   priceCents is null only while the field is mid-edit, which isDetailsValid blocks
-            const created = await createChallenge({title, description, ...coordinate, radius_m: radiusM, start_at: startAt, end_at: endAt, media_type: mediaType, price_cents: priceCents ?? 0, tags});
+            const created = await createChallenge({title, description, ...coordinate, radius_m: radiusM, start_at: startAt, end_at: endAt, voting_end_at: votingEndAt, media_type: mediaType, price_cents: priceCents ?? 0, tags});
 
             // STEP 2: Confirm success
             Alert.alert('Challenge created', `"${created.title}" is now live on the map.`);
@@ -198,14 +211,27 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
                         minimumDate={getChallengeDate()}
                     />
 
-                    <Text style={styles.label}>End date</Text>
+                    <Text style={styles.label}>Entries close</Text>
                     <DateSelector
-                        label="End date"
+                        label="Entries close"
                         value={endAt}
-                        onChange={setEndAt}
+                        onChange={changeEndAt}
                         minimumDate={startAt || getChallengeDate()}   // can't end before it starts
                     />
-                    <Text style={styles.hint}>The challenge runs from the start of the first day through the end of the last.</Text>
+                    <Text style={styles.hint}>People can enter from the start of the first day through the end of this one.</Text>
+
+                    <Text style={styles.label}>Voting ends</Text>
+                    <DateSelector
+                        label="Voting ends"
+                        value={votingEndAt}
+                        onChange={setVotingEndAt}
+                        minimumDate={endAt ? getVotingStartDate({end_at: endAt}) : startAt || getChallengeDate()}   // voting starts the day after entries close
+                    />
+                    <Text style={styles.hint}>
+                        {endAt
+                            ? `Voting opens ${formatDate(getVotingStartDate({end_at: endAt}))}, the day after entries close, and runs through the end of this day.`
+                            : 'Voting opens the day after entries close.'}
+                    </Text>
                 </ScrollView>
             </KeyboardAvoidingView>
         )
@@ -271,8 +297,11 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
                 <Text style={styles.label}>Starts</Text>
                 <Text style={styles.reviewValue}>{formatDate(startAt)}</Text>
 
-                <Text style={styles.label}>Ends</Text>
+                <Text style={styles.label}>Entries close</Text>
                 <Text style={styles.reviewValue}>{formatDate(endAt)}</Text>
+
+                <Text style={styles.label}>Voting</Text>
+                <Text style={styles.reviewValue}>{formatDate(getVotingStartDate({end_at: endAt}))} – {formatDate(votingEndAt)}</Text>
 
                 <Text style={styles.label}>{radiusLabel}</Text>
                 <Text style={styles.reviewValue}>{formatRadius(radiusM)}</Text>

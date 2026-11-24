@@ -4,6 +4,7 @@ import ChallengeList from '@/components/explore/ChallengeList';
 import {Text, View} from 'react-native';
 import {challengeListStyles as styles} from '@/constants/styles';
 import {fetchParticipatingChallenges, type ParticipatingChallenge} from '@/lib/challenges';
+import {describeChallengePhase} from '@/utils/challenge-dates';
 
 export default function JoinedScreen() {
     const [revision, setRevision] = useState(0);
@@ -46,7 +47,7 @@ export default function JoinedScreen() {
                             Joined on: {new Date(challenge.joinedAt).toLocaleString(undefined, {year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'})}
                         </Text>
                         <Text style={styles.participationTag}>
-                            Competition ends on: {new Date(`${challenge.endAt}T12:00:00`).toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'})}
+                            {describeChallengePhase({start_at: challenge.startAt, end_at: challenge.endAt, voting_end_at: challenge.votingEndAt})}
                         </Text>
                     </View>
                 )}

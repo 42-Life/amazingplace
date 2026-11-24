@@ -30,24 +30,35 @@ create policy "Signed-in users can view votes"
     to authenticated
     using (true);
 
--- Users can only vote as themselves.
+-- Votes can only be cast, moved or taken back during the voting period
+-- (see challenge_phase in functions.sql), and only as yourself.
 create policy "users insert their own votes"
     on public.votes for insert
     to authenticated
-    with check (account_id = public.current_account_id());
+    with check (
+        account_id = public.current_account_id()
+        and public.challenge_phase(challenge_id) = 'voting'
+    );
 
--- Users can change which submission their own vote is for.
 create policy "users update their own votes"
     on public.votes for update
     to authenticated
-    using (account_id = public.current_account_id())
-    with check (account_id = public.current_account_id());
+    using (
+        account_id = public.current_account_id()
+        and public.challenge_phase(challenge_id) = 'voting'
+    )
+    with check (
+        account_id = public.current_account_id()
+        and public.challenge_phase(challenge_id) = 'voting'
+    );
 
--- Users can take back their own votes.
 create policy "users delete their own votes"
     on public.votes for delete
     to authenticated
-    using (account_id = public.current_account_id());
+    using (
+        account_id = public.current_account_id()
+        and public.challenge_phase(challenge_id) = 'voting'
+    );
 
 -- See validate_vote_update in functions.sql.
 create trigger validate_vote_update

@@ -23,6 +23,7 @@ import type {Comment} from '@/constants/types';
 import {createComment, deleteComment, fetchCommentsPage, updateComment} from '@/lib/comments';
 import {fetchSubmissionById, type SubmissionDetail} from '@/lib/photos';
 import {fetchChallengeVotes, removeVote, submitVote, updateVote, type ChallengeVotes} from '@/lib/voting';
+import {getVotingClosedMessage} from '@/utils/challenge-dates';
 
 // How many comments each trip to the database brings back
 const COMMENTS_PER_PAGE = 20;
@@ -85,6 +86,12 @@ export default function SubmissionScreen() {
     //   Already voted for this one: nothing (the badge takes a vote back, not a double tap).
     async function castVote() {
         if (!submission || !votes || hasMyVote || isVoting.current) return;
+        // Outside the voting period the database refuses votes (see challenge_phase); say why instead of trying
+        const closedMessage = getVotingClosedMessage(submission.challengeSchedule);
+        if (closedMessage) {
+            Alert.alert('Voting isn’t open', closedMessage);
+            return;
+        }
         // The database refuses this too (see prevent_self_vote); checking here just saves the round trip
         if (submission.isOwn) {
             Alert.alert('Could not vote', 'You can’t vote for your own submission.');
@@ -113,6 +120,12 @@ export default function SubmissionScreen() {
     // KEY HANDLER: TAP THE VOTE BADGE TO TAKE THE VOTE BACK
     async function takeBackVote() {
         if (!submission || !votes || !hasMyVote || isVoting.current) return;
+        // Votes are final once voting closes
+        const closedMessage = getVotingClosedMessage(submission.challengeSchedule);
+        if (closedMessage) {
+            Alert.alert('Voting isn’t open', `${closedMessage} Votes can no longer be changed.`);
+            return;
+        }
         isVoting.current = true;
         try {
             await removeVote(submission.challengeId);

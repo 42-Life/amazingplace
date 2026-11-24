@@ -8,11 +8,13 @@ import PhotoGrid, {type GridPhoto} from './PhotoGrid';
 
 type Props = {
     challengeId: string;
+    // Why votes can't be cast right now (e.g. "Voting opens on Dec 8, 2026, after entries close."), or null while voting is open
+    votingClosedMessage: string | null;
     // voteCount is null while loading or if the votes couldn't be loaded
     header: (submissionCount: number | null, voteCount: number | null) => ReactElement;
 };
 
-export default function ChallengeSubmissionsGrid({challengeId, header}: Props) {
+export default function ChallengeSubmissionsGrid({challengeId, votingClosedMessage, header}: Props) {
     const [photos, setPhotos] = useState<SubmissionPhoto[]>([]);
     const [submissionCount, setSubmissionCount] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
@@ -48,6 +50,11 @@ export default function ChallengeSubmissionsGrid({challengeId, header}: Props) {
     //   No vote yet: cast one. Voted for another photo: move the vote here. Voted for this one: take it back.
     async function vote(photo: GridPhoto) {
         if (!votes || isVoting.current) return;
+        // Outside the voting period the database refuses votes (see challenge_phase); say why instead of trying
+        if (votingClosedMessage) {
+            Alert.alert('Voting isn’t open', votingClosedMessage);
+            return;
+        }
         // The database refuses this too (see prevent_self_vote); checking here just saves the round trip
         if (photo.isOwn) {
             Alert.alert('Could not vote', 'You can’t vote for your own submission.');

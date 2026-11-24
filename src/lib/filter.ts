@@ -25,7 +25,7 @@ export function filterChallengesByStartDate(
     });
 }
 
-// Only challenges whose end date has not passed are included.
+// Only challenges whose voting has not closed are included.
 // Matches part of a title or all stemmed search words in a description, ignoring case.
 // Description words may appear in any order. Blank searches return no results.
 export async function searchChallengesByName(name: string): Promise<ChallengeLocation[]> {
@@ -43,7 +43,7 @@ export async function searchChallengesByName(name: string): Promise<ChallengeLoc
     const {data, error} = await supabase
         .from('challenges')
         .select(CHALLENGE_FIELDS)
-        .gte('end_at', getChallengeDate())
+        .gte('voting_end_at', getChallengeDate())
         .or(filters)
         .order('title');
 
