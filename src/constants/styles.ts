@@ -69,6 +69,9 @@ export const challengeListStyles = StyleSheet.create({
     cardBody: {flex: 1, gap: 6},
     rowsContent: {gap: 0},
     row: {paddingVertical: 16, flexDirection: 'row'},
+    // Title with the row layout's arrow beside it; the title wraps before reaching the arrow
+    titleRow: {flexDirection: 'row', alignItems: 'center', gap: 8},
+    titleText: {flex: 1},
     separator: {height: StyleSheet.hairlineWidth, backgroundColor: colors.inactive},
     title: {fontSize: 18, fontWeight: '700', color: colors.text},
     description: {fontSize: 15, lineHeight: 22, color: colors.inactive},

@@ -122,7 +122,7 @@ export default function ChallengeScreen() {
                     <ChallengeSubmissionsGrid
                         key={challenge.id}
                         challengeId={challenge.id}
-                        header={(submissionCount) => <View style={styles.details}>
+                        header={(submissionCount, voteCount) => <View style={styles.details}>
                             <Text style={styles.title}>{challenge.title}</Text>
                             <ChallengeTagPills tags={challenge.tags} />
                             <View style={styles.tagRow}>
@@ -145,9 +145,14 @@ export default function ChallengeScreen() {
                                     {submissionCount === null ? 'Submissions: —' : `${submissionCount.toLocaleString()} ${submissionCount === 1 ? 'submission' : 'submissions'}`}
                                 </Text>
                             </View>
-                            <Text style={styles.areaTitle}>
-                                End date: {new Date(`${challenge.end_at}T12:00:00`).toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'})}
-                            </Text>
+                            <View style={styles.radiusRow}>
+                                <Text style={styles.areaTitle}>
+                                    End date: {new Date(`${challenge.end_at}T12:00:00`).toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'})}
+                                </Text>
+                                <Text style={styles.submissionTag} accessibilityLiveRegion="polite">
+                                    {voteCount === null ? 'Votes: —' : voteCount === 0 ? 'No votes yet' : `${voteCount.toLocaleString()} ${voteCount === 1 ? 'vote' : 'votes'}`}
+                                </Text>
+                            </View>
                         </View>}
                     />
                     <View style={styles.footer}>

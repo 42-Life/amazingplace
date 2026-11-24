@@ -20,8 +20,10 @@ import {MAX_PRICE_CENTS, MIN_PRICE_CENTS, formatPrice, parsePrice} from '@/utils
 import DateSelector from '@/components/explore/DateSelector';
 import ChallengeAreaMap, {formatRadius} from '@/components/ChallengeAreaMap';
 import MediaTypePicker from '@/components/MediaTypePicker';
+import ChallengeTagPicker from '@/components/ChallengeTagPicker';
+import {ChallengeTags} from '@/components/ChallengeTags';
 import {getChallengeDate} from '@/utils/challenge-dates';
-import type {ChallengeLocation, MediaType} from '@/constants/types';
+import type {ChallengeLocation, ChallengeTagId, MediaType} from '@/constants/types';
 
 // Where the map starts on step 2: BU College of Arts and Sciences
 const START_REGION: Region = {
@@ -64,6 +66,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
     const [description, setDescription] = useState('');
     const [mediaType, setMediaType] = useState<MediaType>('photo');  // whether entries are photos or videos
     const [priceText, setPriceText] = useState('');                  // entry fee as typed, in dollars ('' = free)
+    const [tags, setTags] = useState<ChallengeTagId[]>([]);          // 1 to 3 categories
     const [coordinate, setCoordinate] = useState(startCoordinate);   // the spot under the pin
     const [radiusM, setRadiusM] = useState(DEFAULT_RADIUS_M);        // entries must be taken within this many meters of the pin
     const [startAt, setStartAt] = useState(getChallengeDate());      // first day of the challenge, YYYY-MM-DD (starts as today)
@@ -80,8 +83,8 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
         : priceCents > MAX_PRICE_CENTS ? `A challenge can't cost more than ${formatPrice(MAX_PRICE_CENTS)}.`
         : null;
 
-    // Step 1 is only done once both fields have text, both dates are picked, and the fee is usable
-    const isDetailsValid = title.trim().length > 0 && description.trim().length > 0 && startAt !== '' && endAt !== '' && priceError === null;
+    // Step 1 is only done once both fields have text, a category is picked, both dates are picked, and the fee is usable
+    const isDetailsValid = title.trim().length > 0 && description.trim().length > 0 && tags.length > 0 && startAt !== '' && endAt !== '' && priceError === null;
 
     // Changing the start date clears an end date that would now come before it
     const changeStartAt = (value: string) => {
@@ -101,6 +104,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
         setDescription('');
         setMediaType('photo');
         setPriceText('');
+        setTags([]);
         setCoordinate(startCoordinate);
         setRadiusM(DEFAULT_RADIUS_M);
         setStartAt(getChallengeDate());
@@ -120,7 +124,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
         try {
             // STEP 1: Save the challenge
             //   priceCents is null only while the field is mid-edit, which isDetailsValid blocks
-            const created = await createChallenge({title, description, ...coordinate, radius_m: radiusM, start_at: startAt, end_at: endAt, media_type: mediaType, price_cents: priceCents ?? 0});
+            const created = await createChallenge({title, description, ...coordinate, radius_m: radiusM, start_at: startAt, end_at: endAt, media_type: mediaType, price_cents: priceCents ?? 0, tags});
 
             // STEP 2: Confirm success
             Alert.alert('Challenge created', `"${created.title}" is now live on the map.`);
@@ -166,6 +170,9 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
                         maxLength={500}
                     />
                     <Text style={styles.hint}>{description.length}/500</Text>
+
+                    <Text style={styles.label}>Categories</Text>
+                    <ChallengeTagPicker value={tags} onChange={setTags} />
 
                     <Text style={styles.label}>Entry fee</Text>
                     <TextInput
@@ -248,6 +255,9 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
 
                 <Text style={styles.label}>Description</Text>
                 <Text style={styles.reviewValue}>{description.trim()}</Text>
+
+                <Text style={styles.label}>Categories</Text>
+                <ChallengeTags tags={tags} />
 
                 <Text style={styles.label}>Entry fee</Text>
                 <Text style={styles.reviewValue}>{priceCents ? formatPrice(priceCents) : 'Free'}</Text>
