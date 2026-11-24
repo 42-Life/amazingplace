@@ -51,6 +51,8 @@ export default function ChallengeList<T extends ChallengeListItem>({challenges, 
             keyboardDismissMode="on-drag"
             keyExtractor={(challenge) => challenge.id}
             ItemSeparatorComponent={layout === 'rows' ? () => <View style={styles.separator} /> : undefined}
+            // Rows: one more divider under the last challenge, so every challenge has one below it
+            ListFooterComponent={layout === 'rows' && challenges.length > 0 ? <View style={styles.separator} /> : undefined}
             ListEmptyComponent={
                 <View style={styles.centered}>
                     <Text style={styles.title}>{emptyTitle ?? (searchQuery.trim() || hasDateFilter ? 'No matching challenges' : 'No challenges yet')}</Text>
@@ -70,7 +72,11 @@ export default function ChallengeList<T extends ChallengeListItem>({challenges, 
                 >
                     {/* Title & Desctiption*/}
                     <View style={styles.cardBody}>
-                        <Text style={styles.title}>{challenge.title}</Text>
+                        {/* Rows show the arrow on the title line; cards show it centered on the right (below) */}
+                        <View style={styles.titleRow}>
+                            <Text style={[styles.title, styles.titleText]}>{challenge.title}</Text>
+                            {layout === 'rows' && <Ionicons name="chevron-forward" size={22} color={theme.colors.inactive} />}
+                        </View>
                         <Text style={[styles.description, layout === 'rows' && styles.rowDescription]} numberOfLines={layout === 'rows' ? 2 : 3} ellipsizeMode="tail">{challenge.description}</Text>
                         {renderDetails?.(challenge)}
                         {/* Challenge tags*/}

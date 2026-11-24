@@ -72,6 +72,15 @@ export type Account = {
     email: string
 }
 
+// One account's vote in a challenge (each account gets one vote per challenge)
+export type Vote = {
+    id: string
+    account_id: string
+    submission_id: string
+    challenge_id: string
+    created_at: string
+}
+
 // Challenge Tags
 export type ChallengeTagId =
     | 'pranks_humor'
