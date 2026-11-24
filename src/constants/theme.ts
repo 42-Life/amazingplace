@@ -113,6 +113,13 @@ export const theme = {
     tabBar: {
         iconSize: 24,
     },
+
+    challengePhases: {
+        upcoming: '#2563EB',
+        entry: '#15803D',
+        voting: '#CA8A04',
+        closed: '#DC2626',
+    }
 };
 
 // frosted blue: 9ad1d4

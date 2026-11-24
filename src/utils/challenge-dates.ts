@@ -2,6 +2,8 @@
 // Challenge dates are calendar days (YYYY-MM-DD), so a challenge stays open through that entire local day.
 // No imports, so the tests can load this file directly.
 
+import { theme } from "@/constants/theme";
+
 // end_at is a date, so challenges remain active through that entire local day.
 export function getChallengeDate(date = new Date()): string {
     const year = date.getFullYear();
@@ -82,3 +84,19 @@ export const CHALLENGE_PHASE_LABELS: Record<ChallengePhase, string> = {
     voting: 'Voting',
     closed: 'Closed',
 };
+
+export const CHALLENGE_PHASE_STYLES: Record<ChallengePhase, string> = {
+    upcoming: theme.challengePhases.upcoming,
+    entry: theme.challengePhases.entry,
+    voting: theme.challengePhases.voting,
+    closed: theme.challengePhases.closed,
+}
+
+export function getChallengePhaseDisplay(challenge: ChallengeSchedule, today = getChallengeDate()) {
+    const phase = getChallengePhase(challenge, today);
+    return {
+        phase,
+        label: CHALLENGE_PHASE_LABELS[phase],
+        color: CHALLENGE_PHASE_STYLES[phase],
+    };
+}
