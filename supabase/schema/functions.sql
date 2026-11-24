@@ -173,3 +173,21 @@ begin
     return new;
 end;
 $$;
+
+-- Nobody may vote for their own submission.
+-- Runs on insert and on update, so a vote can't be cast for, or moved onto, the voter's own entry.
+create or replace function public.prevent_self_vote()
+returns trigger
+language plpgsql
+set search_path to 'public'
+as $$
+begin
+    if exists (
+        select 1 from public.submissions s
+        where s.id = new.submission_id and s.account_id = new.account_id
+    ) then
+        raise exception 'You can''t vote for your own submission.';
+    end if;
+    return new;
+end;
+$$;

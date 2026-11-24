@@ -54,5 +54,10 @@ create trigger validate_vote_update
     before update on public.votes
     for each row execute function public.validate_vote_update();
 
+-- See prevent_self_vote in functions.sql.
+create trigger prevent_self_vote
+    before insert or update on public.votes
+    for each row execute function public.prevent_self_vote();
+
 grant select, insert, update, delete on table public.votes to authenticated;
 grant all on table public.votes to service_role;

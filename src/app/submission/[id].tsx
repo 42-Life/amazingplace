@@ -85,6 +85,11 @@ export default function SubmissionScreen() {
     //   Already voted for this one: nothing (the badge takes a vote back, not a double tap).
     async function castVote() {
         if (!submission || !votes || hasMyVote || isVoting.current) return;
+        // The database refuses this too (see prevent_self_vote); checking here just saves the round trip
+        if (submission.isOwn) {
+            Alert.alert('Could not vote', 'You can’t vote for your own submission.');
+            return;
+        }
         isVoting.current = true;
         const previous = votes.mySubmissionId;
         try {

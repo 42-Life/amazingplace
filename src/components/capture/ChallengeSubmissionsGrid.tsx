@@ -48,6 +48,11 @@ export default function ChallengeSubmissionsGrid({challengeId, header}: Props) {
     //   No vote yet: cast one. Voted for another photo: move the vote here. Voted for this one: take it back.
     async function vote(photo: GridPhoto) {
         if (!votes || isVoting.current) return;
+        // The database refuses this too (see prevent_self_vote); checking here just saves the round trip
+        if (photo.isOwn) {
+            Alert.alert('Could not vote', 'You can’t vote for your own submission.');
+            return;
+        }
         isVoting.current = true;
         const previous = votes.mySubmissionId;
         try {

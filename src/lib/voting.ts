@@ -1,5 +1,6 @@
 // VOTING
-// Casting and changing a vote. Each account gets one vote per challenge (enforced by the votes table).
+// Casting and changing a vote. Each account gets one vote per challenge (enforced by the votes table),
+// and nobody can vote for their own submission (enforced by the prevent_self_vote trigger).
 
 // KEY IMPORTS
 import { supabase } from '@/lib/supabase';
