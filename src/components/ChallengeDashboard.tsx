@@ -61,8 +61,9 @@ function DashboardList({onRetry}: {onRetry: () => void}) {
             renderItem={({item}) => (
                 <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Edit challenge: ${item.title}`}
-                    onPress={() => router.push({pathname: '/manage-challenge/[id]', params: {id: item.id}})}
+                    accessibilityLabel={`View stats: ${item.title}`}
+                    // Opens the stats page; editing is a button on that page
+                    onPress={() => router.push({pathname: '/challenge-stats/[id]', params: {id: item.id}})}
                     style={({pressed}) => [listStyles.row, pressed && listStyles.pressed]}
                 >
                     <View style={listStyles.cardBody}>

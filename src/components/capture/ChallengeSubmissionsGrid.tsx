@@ -1,11 +1,10 @@
 import {useEffect, useRef, useState, type ReactElement} from 'react';
 import {ActivityIndicator, Alert, Pressable, StyleSheet, Text, View} from 'react-native';
+import {router} from 'expo-router';
 import {fetchChallengeSubmissions, type SubmissionPhoto} from '@/lib/photos';
 import {fetchChallengeVotes, removeVote, submitVote, updateVote, type ChallengeVotes} from '@/lib/voting';
 import {theme} from '@/constants/theme';
 import PhotoGrid, {type GridPhoto} from './PhotoGrid';
-import ImageViewer from './ImageViewer';
-import VideoViewer from './VideoViewer';
 
 type Props = {
     challengeId: string;
@@ -19,7 +18,6 @@ export default function ChallengeSubmissionsGrid({challengeId, header}: Props) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
     const [revision, setRevision] = useState(0);
-    const [selected, setSelected] = useState<GridPhoto | null>(null);
     const [votes, setVotes] = useState<ChallengeVotes | null>(null);   // null until loaded
     const isVoting = useRef(false);                                     // blocks a second vote while one is saving
 
@@ -50,6 +48,11 @@ export default function ChallengeSubmissionsGrid({challengeId, header}: Props) {
     //   No vote yet: cast one. Voted for another photo: move the vote here. Voted for this one: take it back.
     async function vote(photo: GridPhoto) {
         if (!votes || isVoting.current) return;
+        // The database refuses this too (see prevent_self_vote); checking here just saves the round trip
+        if (photo.isOwn) {
+            Alert.alert('Could not vote', 'You can’t vote for your own submission.');
+            return;
+        }
         isVoting.current = true;
         const previous = votes.mySubmissionId;
         try {
@@ -85,7 +88,8 @@ export default function ChallengeSubmissionsGrid({challengeId, header}: Props) {
         <>
             <PhotoGrid
                 photos={photos}
-                onPhotoPress={setSelected}
+                // A tap opens the submission's own page: the photo or video, with its comments
+                onPhotoPress={(photo: GridPhoto) => router.push(`/submission/${photo.id}`)}
                 onPhotoDoublePress={vote}
                 voteCounts={votes?.counts}
                 refreshing={loading}
@@ -103,9 +107,6 @@ export default function ChallengeSubmissionsGrid({challengeId, header}: Props) {
                     </View>
                 }
             />
-            {selected && (selected.mediaType === 'video'
-                ? <VideoViewer key={selected.id} videoUrl={selected.imageUrl} onClose={() => setSelected(null)} />
-                : <ImageViewer key={selected.id} imageUrl={selected.imageUrl} onClose={() => setSelected(null)} />)}
         </>
     );
 }

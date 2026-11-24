@@ -11,6 +11,7 @@ create table public.challenges (
     creator_account_id uuid default public.current_account_id(),
     media_type text not null default 'photo',
     price_cents integer not null default 0,
+    tags text[] not null default array['other']::text[],
 
     constraint challenges_pkey primary key (id),
     constraint challenges_creator_account_id_fkey foreign key (creator_account_id)
@@ -21,6 +22,24 @@ create table public.challenges (
     -- The floor is Stripe's minimum charge for USD; anything under it is rejected by the API.
     constraint challenges_price_cents_check check (
         price_cents = 0 or price_cents between 50 and 100000
+    ),
+    -- Every challenge has 1 to 3 category tags, all from the known list.
+    constraint challenges_tags_valid check (
+        cardinality(tags) between 1 and 3
+        and tags <@ array[
+            'pranks_humor',
+            'dares_skits',
+            'everyday_life',
+            'nature_scenery',
+            'art_music',
+            'sports_fitness',
+            'photography',
+            'food_drink',
+            'animals_pets',
+            'scavenger_hunt',
+            'community_kindness',
+            'other'
+        ]::text[]
     )
 );
 

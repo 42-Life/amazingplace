@@ -12,7 +12,9 @@ import {createChallengeStyles as formStyles} from '@/constants/styles';
 import {theme} from '@/constants/theme';
 import ChallengeTagPicker from '@/components/ChallengeTagPicker';
 
-export default function EditChallengeForm({challenge, onClose}: {challenge: ChallengeLocation; onClose: () => void}) {
+// onClose: back out, or done saving. onDeleted: the challenge is gone, so the page that
+// opened this form (its stats page) has nothing left to show.
+export default function EditChallengeForm({challenge, onClose, onDeleted}: {challenge: ChallengeLocation; onClose: () => void; onDeleted: () => void}) {
     const [title, setTitle] = useState(challenge.title);
     const [description, setDescription] = useState(challenge.description ?? '');
     const [startAt, setStartAt] = useState(challenge.start_at);
@@ -63,7 +65,7 @@ export default function EditChallengeForm({challenge, onClose}: {challenge: Chal
         setError(null);
         try {
             await deleteChallenge(challenge.id);
-            onClose();
+            onDeleted();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Could not delete this challenge.');
         } finally {
@@ -74,7 +76,7 @@ export default function EditChallengeForm({challenge, onClose}: {challenge: Chal
     return (
         <SafeAreaView style={formStyles.safe} edges={['top', 'bottom']}>
             <View style={styles.header}>
-                <Pressable accessibilityRole="button" accessibilityLabel="Back to challenge dashboard" onPress={onClose} disabled={busy} style={styles.back}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onClose} disabled={busy} style={styles.back}>
                     <Ionicons name="chevron-back" size={28} color={theme.colors.text} />
                 </Pressable>
                 <Text style={formStyles.title}>Edit challenge</Text>

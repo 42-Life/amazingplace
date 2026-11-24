@@ -4,6 +4,7 @@
 // KEY IMPORTS
 import { supabase } from '@/lib/supabase';
 import { fetchMyAccount } from '@/lib/accounts';
+import { fetchAllRows } from '@/lib/fetch-all-rows';
 import {getChallengeDate} from '@/utils/challenge-dates';
 import {distanceInMeters} from '@/utils/distance';
 import {getVideoFile, isValidVideoDuration, MAX_VIDEO_BYTES} from '@/utils/media';
@@ -183,6 +184,82 @@ export async function fetchChallengeSubmissions(challengeId: string): Promise<{p
         isOwn: row.account_id === account?.id,
     })).sort((a, b) => Number(b.isOwn) - Number(a.isOwn));
     return {photos, total: count ?? photos.length};
+}
+
+// FETCH ONE SUBMISSION
+// The submission shown on the submission page, or null if it has been deleted.
+// Includes its challenge, which voting needs (a vote is one per account per challenge).
+export type SubmissionDetail = SubmissionPhoto & {challengeId: string};
+
+export async function fetchSubmissionById(submissionId: string): Promise<SubmissionDetail | null> {
+    const account = await fetchMyAccount();
+    const {data: row, error} = await supabase
+        .from('submissions')
+        .select('id, challenge_id, image_path, media_type, duration_ms, created_at, account_id, accounts(username)')
+        .eq('id', submissionId)
+        .maybeSingle()
+        .overrideTypes<{
+            id: string;
+            challenge_id: string;
+            image_path: string;
+            media_type: MediaType;
+            duration_ms: number | null;
+            created_at: string;
+            account_id: string;
+            accounts: {username: string} | null;
+        }, {merge: false}>();
+    if (error) throw error;
+    if (!row) return null;
+    return {
+        id: row.id,
+        challengeId: row.challenge_id,
+        imageUrl: getMediaUrl(row.media_type, row.image_path),
+        mediaType: row.media_type,
+        durationMs: row.duration_ms,
+        createdAt: row.created_at,
+        username: row.accounts?.username ?? 'unknown',
+        isOwn: row.account_id === account?.id,
+    };
+}
+
+// SUBMISSION STATS ROW
+// What the stats page needs from each submission: who made it, when, and its file for the top 3
+export type SubmissionStatsRow = Pick<Submission, 'id' | 'imageUrl' | 'mediaType' | 'durationMs' | 'createdAt'> & {
+    accountId: string
+    username: string
+};
+
+// FETCH SUBMISSION STATS ROWS
+// Every submission in one challenge, oldest first. Used by the stats page (src/lib/challenge-stats.ts).
+//   All of them, not just the first 1000, since the chart and totals count every one
+export async function fetchSubmissionStatsRows(challengeId: string): Promise<SubmissionStatsRow[]> {
+    type Row = {
+        id: string;
+        image_path: string;
+        media_type: MediaType;
+        duration_ms: number | null;
+        created_at: string;
+        account_id: string;
+        accounts: {username: string} | null;
+    };
+    const rows = await fetchAllRows<Row>((from, to) => supabase
+        .from('submissions')
+        .select('id, image_path, media_type, duration_ms, created_at, account_id, accounts(username)')
+        .eq('challenge_id', challengeId)
+        .order('created_at', {ascending: true})
+        .order('id', {ascending: true})   // tie-breaker, so the pages never overlap
+        .range(from, to)
+        .overrideTypes<Row[], {merge: false}>());
+
+    return rows.map((row) => ({
+        id: row.id,
+        imageUrl: getMediaUrl(row.media_type, row.image_path),
+        mediaType: row.media_type,
+        durationMs: row.duration_ms,
+        createdAt: row.created_at,
+        accountId: row.account_id,
+        username: row.accounts?.username ?? 'unknown',
+    }));
 }
 
 // FETCH MY SUBMISSIONS

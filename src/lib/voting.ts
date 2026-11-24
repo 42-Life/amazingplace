@@ -1,9 +1,11 @@
 // VOTING
-// Casting and changing a vote. Each account gets one vote per challenge (enforced by the votes table).
+// Casting and changing a vote. Each account gets one vote per challenge (enforced by the votes table),
+// and nobody can vote for their own submission (enforced by the prevent_self_vote trigger).
 
 // KEY IMPORTS
 import { supabase } from '@/lib/supabase';
 import { fetchMyAccount } from '@/lib/accounts';
+import { fetchAllRows } from '@/lib/fetch-all-rows';
 import type { Vote } from '@/constants/types';
 
 
@@ -22,19 +24,21 @@ export type ChallengeVotes = {
 // FETCH CHALLENGE VOTES
 export async function fetchChallengeVotes(challengeId: string): Promise<ChallengeVotes> {
     const account = await fetchMyAccount();
-    const {data, error} = await supabase
+    // Every vote, not just the first 1000 (see fetch-all-rows.ts). Ordered by id so the pages don't overlap.
+    const data = await fetchAllRows<{account_id: string; submission_id: string}>((from, to) => supabase
         .from('votes')
         .select('account_id, submission_id')
-        .eq('challenge_id', challengeId);
-    if (error) throw error;
+        .eq('challenge_id', challengeId)
+        .order('id')
+        .range(from, to));
 
     const counts: Record<string, number> = {};
     let mySubmissionId: string | null = null;
-    for (const vote of data ?? []) {
+    for (const vote of data) {
         counts[vote.submission_id] = (counts[vote.submission_id] ?? 0) + 1;
         if (vote.account_id === account?.id) mySubmissionId = vote.submission_id;
     }
-    return {counts, total: data?.length ?? 0, mySubmissionId};
+    return {counts, total: data.length, mySubmissionId};
 }
 
 
