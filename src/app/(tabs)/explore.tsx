@@ -20,7 +20,7 @@ import ChallengeFilterModal from '@/components/explore/ChallengeFilterModal';
 import ChallengeList from '@/components/explore/ChallengeList';
 import { challengeMapMarkersStyles, challengeListStyles as styles } from "@/constants/styles";
 import { theme } from "@/constants/theme";
-import { ChallengeLocation } from "@/constants/types";
+import { ChallengeLocation, ChallengeSort } from "@/constants/types";
 import { fetchChallenges } from "@/lib/challenges";
 // Search stays in filter.ts; the combined filters (date + photo/video + distance) live in challenge-filters.ts
 import { searchChallengesByName } from '@/lib/filter';
@@ -36,6 +36,9 @@ import {
     Text,
     View
 } from "react-native";
+
+// Challenge Sort Imports
+import { CHALLENGE_SORT_OPTIONS, sortChallenges,} from '@/lib/challenge-sort';
 
 // CONSTANTS FOR MAP
 // Initial Location: BU College of Arts and Sciences
@@ -58,6 +61,7 @@ export default function ExploreScreen() {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchDraft, setSearchDraft] = useState('');
     const [filtersVisible, setFiltersVisible] = useState(false);
+    const [sort, setSort] = useState<ChallengeSort | null>(null); // // null means no sorting has been applied.
 
     // FILTER STATE
     // STEP 1: the current filter settings (dates, photo/video, distance)
@@ -86,6 +90,11 @@ export default function ExploreScreen() {
     const visibleLocations = useMemo(
         () => applyChallengeFilters(locations, filters, userCoordinate),
         [locations, filters, userCoordinate],
+    );
+    // Sorted visible locations: Apply filter to sort locations. Used only on list view, not map.
+    const sortedVisibleLocations = useMemo(
+        () => sortChallenges(visibleLocations, sort),
+        [visibleLocations, sort],
     );
     const [initialRegion, setInitialRegion] = useState<Region | null>(null);   // null until we know where to start the map
     const [hasLocationPermission, setHasLocationPermission] = useState(false); // controls the blue "you are here" dot
@@ -392,12 +401,14 @@ export default function ExploreScreen() {
                 {/* STEP 1: list view, using the combined "any filter on" flag for its empty message */}
                 {viewMode === 'list' && (
                     <ChallengeList
-                        challenges={visibleLocations}
+                        challenges={sortedVisibleLocations} // Now SORTED set of locations. Changed from just being visibleLocations
                         hasDateFilter={hasActiveFilters}
                         searchQuery={searchQuery}
                         isLoading={isLoading}
                         errorMessage={errorMessage}
                         onRetry={refreshChallenges}
+                        sort={sort}
+                        onSortChange={setSort}
                     />
                 )}
                 {/* STEP 2: map view */}

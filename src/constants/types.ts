@@ -33,6 +33,7 @@ export type ChallengeLocation = {
     description: string
     latitude: number
     longitude: number
+    // TODO: Add created_at property and link it to Supabase. Allows for sort by newest/oldest (created)
     start_at: string
     end_at: string          // last day of the entry period, YYYY-MM-DD
     voting_end_at: string   // last day of the voting period, YYYY-MM-DD (voting starts the day after end_at)
@@ -128,4 +129,29 @@ export type ChallengeTagPickerProps = {
     value: ChallengeTagId[];
     onChange: (next: ChallengeTagId[]) => void;
     disabled?: boolean;
+};
+
+// Challenge Sort Types
+// CHALLENGE SORTING TYPES
+
+// The fields that challenges can be sorted by
+export type ChallengeSortField =
+    // | 'added'
+    // TODO: uncomment added once ChallengeLocation type & Supabase is updated to have a created_at field. Then implement sort by newest/oldest
+    | 'ending'
+    | 'duration'
+    | 'price';
+
+// The selected sorting field and direction
+export type ChallengeSort = {
+    field: ChallengeSortField;
+    direction: 'asc' | 'desc';
+};
+
+// An option displayed in the "Sort By..." dropdown
+export type ChallengeSortOption = {
+    field: ChallengeSortField;
+    direction: 'asc' | 'desc';
+    fieldLabel: string;
+    directionLabel: string;
 };

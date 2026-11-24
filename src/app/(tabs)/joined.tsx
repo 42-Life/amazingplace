@@ -3,6 +3,7 @@ import {useFocusEffect} from 'expo-router';
 import ChallengeList from '@/components/explore/ChallengeList';
 import {Text, View} from 'react-native';
 import {challengeListStyles as styles} from '@/constants/styles';
+import type {ChallengeSort} from '@/constants/types';
 import {fetchParticipatingChallenges, type ParticipatingChallenge} from '@/lib/challenges';
 import {describeChallengePhase} from '@/utils/challenge-dates';
 
@@ -11,6 +12,7 @@ export default function JoinedScreen() {
 
     function ParticipatingChallengeList({onRetry}: {onRetry: () => void}) {
         const [challenges, setChallenges] = useState<ParticipatingChallenge[]>([]);
+        const [sort, setSort] = useState<ChallengeSort | null>(null);
         const [isLoading, setIsLoading] = useState(true);
         const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -39,6 +41,8 @@ export default function JoinedScreen() {
                 errorMessage={errorMessage}
                 onRetry={onRetry}
                 searchQuery=""
+                sort={sort}
+                onSortChange={setSort}
                 emptyTitle="No participating challenges yet"
                 emptyMessage="Submit a photo to a challenge in Explore to see it here."
                 renderDetails={(challenge) => (
