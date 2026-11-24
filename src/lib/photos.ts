@@ -185,6 +185,42 @@ export async function fetchChallengeSubmissions(challengeId: string): Promise<{p
     return {photos, total: count ?? photos.length};
 }
 
+// FETCH ONE SUBMISSION
+// The submission shown on the submission page, or null if it has been deleted.
+// Includes its challenge, which voting needs (a vote is one per account per challenge).
+export type SubmissionDetail = SubmissionPhoto & {challengeId: string};
+
+export async function fetchSubmissionById(submissionId: string): Promise<SubmissionDetail | null> {
+    const account = await fetchMyAccount();
+    const {data: row, error} = await supabase
+        .from('submissions')
+        .select('id, challenge_id, image_path, media_type, duration_ms, created_at, account_id, accounts(username)')
+        .eq('id', submissionId)
+        .maybeSingle()
+        .overrideTypes<{
+            id: string;
+            challenge_id: string;
+            image_path: string;
+            media_type: MediaType;
+            duration_ms: number | null;
+            created_at: string;
+            account_id: string;
+            accounts: {username: string} | null;
+        }, {merge: false}>();
+    if (error) throw error;
+    if (!row) return null;
+    return {
+        id: row.id,
+        challengeId: row.challenge_id,
+        imageUrl: getMediaUrl(row.media_type, row.image_path),
+        mediaType: row.media_type,
+        durationMs: row.duration_ms,
+        createdAt: row.created_at,
+        username: row.accounts?.username ?? 'unknown',
+        isOwn: row.account_id === account?.id,
+    };
+}
+
 // FETCH MY SUBMISSIONS
 // Gets every photo and video the signed-in user has submitted, newest first (used by the gallery)
 export async function fetchMySubmissions(): Promise<Submission[]> {

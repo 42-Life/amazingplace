@@ -64,6 +64,26 @@ export async function fetchComments(submissionId: string): Promise<Comment[]> {
 }
 
 
+// FETCH A PAGE OF COMMENTS
+// The next `limit` comments under a submission, oldest first, skipping the first `offset`.
+// Used by the submission page, which loads more as the user scrolls down.
+//   Fewer rows back than `limit` means there are no more to load.
+//   Oldest first keeps the paging steady: new comments land at the end, not in the middle.
+export async function fetchCommentsPage(submissionId: string, offset: number, limit = 20): Promise<Comment[]> {
+    const account = await fetchMyAccount();
+    const {data, error} = await supabase
+        .from('comments')
+        .select(COMMENT_FIELDS)
+        .eq('submission_id', submissionId)
+        .order('created_at', {ascending: true})
+        .order('id', {ascending: true})   // tie-breaker, so two comments in the same instant keep one order
+        .range(offset, offset + limit - 1)
+        .overrideTypes<CommentRow[], {merge: false}>();
+    if (error) throw error;
+    return (data ?? []).map((row) => toComment(row, account?.id));
+}
+
+
 // CREATE COMMENT
 // Posts a comment under a submission as the signed-in user.
 export async function createComment(submissionId: string, body: string): Promise<Comment> {

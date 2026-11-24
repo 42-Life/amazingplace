@@ -1,6 +1,6 @@
 // VIDEO TILE
 // Stand-in for a video in the submission grids: a dark square with a play icon and the video's length.
-// Grids don't load or play videos (many players at once are heavy); tapping a tile opens VideoViewer instead.
+// Grids don't load or play videos (many players at once are heavy); tapping a tile opens the submission page, which plays it.
 // Real thumbnails could replace this later.
 
 import {StyleSheet, Text, View, type StyleProp, type ViewStyle} from 'react-native';
