@@ -5,12 +5,13 @@
 import type { ChallengeLocation } from '@/constants/types';
 import { supabase } from '@/lib/supabase';
 import { fetchMyAccount } from '@/lib/accounts';
+import { deleteChallengePreview, uploadChallengePreview } from '@/lib/challenge-previews';
 import { getChallengeDate, isValidChallengeDate } from '@/utils/challenge-dates';
 import { MAX_PRICE_CENTS, MIN_PRICE_CENTS, formatPrice, isValidPriceCents } from '@/utils/price';
 
 
 // The columns every challenge query asks for, so none of them can forget one (e.g. media_type)
-export const CHALLENGE_FIELDS = 'id, title, description, latitude, longitude, start_at, end_at, radius_m, media_type, price_cents';
+export const CHALLENGE_FIELDS = 'id, title, description, latitude, longitude, start_at, end_at, radius_m, media_type, price_cents, preview_path';
 
 
 // FETCH CHALLENGES
@@ -59,6 +60,7 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
             radius_m: Number(challenge.radius_m),
             media_type: challenge.media_type,
             price_cents: Number(challenge.price_cents ?? 0),
+            preview_path: challenge.preview_path ?? null,
         }]
     })
 
@@ -123,7 +125,9 @@ export async function fetchChallengeById(id: string): Promise<ChallengeLocation 
 // NEW CHALLENGE TYPE
 // What the user fills in when creating a challenge (the app picks the id).
 // Everything here is required, matching the columns the database won't allow to be null.
-export type NewChallenge = Omit<ChallengeLocation, 'id'>;
+//   preview_path is left out: the form holds a photo off the phone, and createChallenge
+//   uploads it and fills the column in.
+export type NewChallenge = Omit<ChallengeLocation, 'id' | 'preview_path'>;
 
 
 // Includes upcoming, active and ended challenges owned by this account.
@@ -258,7 +262,9 @@ async function generateChallengeId(title: string): Promise<string> {
 
 // CREATE CHALLENGE
 // Checks the details, saves a new challenge to the database, and returns it (with its new id).
-export async function createChallenge(challenge: NewChallenge): Promise<ChallengeLocation> {
+// previewUri is the optional preview photo picked off the phone; it's uploaded here, once
+// everything else has passed, so a rejected form never leaves a photo behind in storage.
+export async function createChallenge(challenge: NewChallenge, previewUri?: string | null): Promise<ChallengeLocation> {
     // STEP 1: Clean up the text and make sure nothing important is missing
     const title = challenge.title.trim();
     const description = challenge.description.trim();
@@ -303,18 +309,26 @@ export async function createChallenge(challenge: NewChallenge): Promise<Challeng
     // STEP 4: Make an id that no other challenge is using
     const id = await generateChallengeId(title);
 
-    // STEP 5: Insert the challenge and ask the database to send the saved row back
+    // STEP 5: Upload the preview photo, if the creator picked one.
+    //   Last thing before the insert: everything that can refuse the challenge has run by now.
+    const preview_path = previewUri ? await uploadChallengePreview(previewUri) : null;
+
+    // STEP 6: Insert the challenge and ask the database to send the saved row back
     const {data, error} = await supabase
         .from('challenges')
-        .insert({id, title, description, latitude, longitude, radius_m, start_at, end_at, media_type, price_cents, creator_account_id: account.id})
+        .insert({id, title, description, latitude, longitude, radius_m, start_at, end_at, media_type, price_cents, preview_path, creator_account_id: account.id})
         .select(CHALLENGE_FIELDS)
         .single();
 
-    // STEP 6: Stop here if saving failed
+    // STEP 7: Stop here if saving failed, deleting the preview photo first so no file
+    //   is left in storage that nothing points at
     //   Code 23505 means the id was taken after our check (someone else created a challenge at the same moment)
-    if (error?.code === '23505') throw new Error('Another challenge was just created with a similar name. Please try again.');
-    if (error) throw error;
+    if (error) {
+        if (preview_path) await deleteChallengePreview(preview_path);
+        if (error.code === '23505') throw new Error('Another challenge was just created with a similar name. Please try again.');
+        throw error;
+    }
 
-    // STEP 7: Return the new challenge, so the app can show it right away
+    // STEP 8: Return the new challenge, so the app can show it right away
     return data as ChallengeLocation;
 }

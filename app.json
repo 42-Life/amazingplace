@@ -58,6 +58,12 @@
       ],
       "expo-video",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to use your photos so you can add a preview photo to a challenge."
+        }
+      ],
+      [
         "@stripe/stripe-react-native",
         {
           "enableGooglePay": false

@@ -25,6 +25,28 @@ export function getVideoFile(uri: string): VideoFile {
         : {extension: 'mp4', contentType: 'video/mp4'};
 }
 
+// A challenge's preview photo can be at most this big. Matches the "challenge-previews" bucket's limit (5 MiB).
+export const MAX_PREVIEW_BYTES = 5 * 1024 * 1024;
+
+export type PreviewFile = {extension: 'jpg' | 'png' | 'webp'; contentType: 'image/jpeg' | 'image/png' | 'image/webp'};
+
+// The formats the "challenge-previews" bucket accepts, by the extension of the file picked.
+const PREVIEW_FILES: Record<string, PreviewFile> = {
+    jpg: {extension: 'jpg', contentType: 'image/jpeg'},
+    jpeg: {extension: 'jpg', contentType: 'image/jpeg'},
+    png: {extension: 'png', contentType: 'image/png'},
+    webp: {extension: 'webp', contentType: 'image/webp'},
+};
+
+// PREVIEW FILE TYPE
+// Reads the format of a photo picked from the library, the same way getVideoFile reads a recording's.
+// Returns null for anything the bucket would refuse, so the app can say so before uploading.
+export function getPreviewFile(uri: string): PreviewFile | null {
+    const path = uri.split(/[?#]/)[0];
+    const extension = path.slice(path.lastIndexOf('.') + 1).toLowerCase();
+    return PREVIEW_FILES[extension] ?? null;
+}
+
 // VIDEO DURATION CHECK
 // True when a recording's length is one the database will accept (more than 0, up to 31 s).
 export function isValidVideoDuration(durationMs: number): boolean {

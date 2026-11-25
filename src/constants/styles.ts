@@ -129,6 +129,13 @@ export const challengeMapMarkersStyles = StyleSheet.create({
     },
     cardTitle: {fontSize: 18, fontWeight: '700'},
     cardBody: {fontSize: 14},
+    // The challenge's preview photo, when it has one. Full card width, above the title.
+    cardImage: {
+        width: '100%',
+        height: 140,
+        borderRadius: 12,
+        backgroundColor: '#E5E7EB',   // fills the frame while the photo loads
+    },
 
     button: {
         marginTop: 8,
@@ -393,6 +400,51 @@ export const createChallengeStyles = StyleSheet.create({
         color: colors.active,
     },
 
+
+    // Step 1: optional preview photo (shown again on the review step)
+    previewPicker: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        minHeight: 48,
+        borderWidth: 1,
+        borderStyle: 'dashed',   // dashed, so an empty picker doesn't read as a text field
+        borderColor: colors.tabBarBorder,
+        borderRadius: 10,
+    },
+    previewPickerText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: colors.text,
+    },
+    previewImage: {
+        width: '100%',
+        height: 180,
+        borderRadius: 10,
+        backgroundColor: colors.tabBarBorder,   // fills the frame while the photo loads
+    },
+    previewActions: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    previewAction: {
+        flex: 1,
+        minHeight: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: colors.tabBarBorder,
+        borderRadius: 10,
+    },
+    previewActionText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: colors.text,
+    },
+    previewActionRemove: {
+        color: '#B91C1C',
+    },
 
     // Step 2: map with a pin locked to the centre
     mapWrapper: {

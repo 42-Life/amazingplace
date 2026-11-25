@@ -11,6 +11,8 @@ create table public.challenges (
     creator_account_id uuid default public.current_account_id(),
     media_type text not null default 'photo',
     price_cents integer not null default 0,
+    -- Optional preview photo, as its path in the "challenge-previews" bucket. Null means none.
+    preview_path text,
 
     constraint challenges_pkey primary key (id),
     constraint challenges_creator_account_id_fkey foreign key (creator_account_id)

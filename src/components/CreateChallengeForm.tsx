@@ -12,10 +12,14 @@ import {ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, Scr
 import type {LatLng, Region} from 'react-native-maps';
 import {Slider} from '@expo/ui/community/slider';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {Ionicons} from '@expo/vector-icons';
+import {Image} from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 // Internal imports
 import {theme} from '@/constants/theme';
 import {createChallengeStyles as styles} from '@/constants/styles';
 import {createChallenge} from '@/lib/challenges';
+import {getPreviewFile} from '@/utils/media';
 import {MAX_PRICE_CENTS, MIN_PRICE_CENTS, formatPrice, parsePrice} from '@/utils/price';
 import DateSelector from '@/components/explore/DateSelector';
 import ChallengeAreaMap, {formatRadius} from '@/components/ChallengeAreaMap';
@@ -64,6 +68,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
     const [description, setDescription] = useState('');
     const [mediaType, setMediaType] = useState<MediaType>('photo');  // whether entries are photos or videos
     const [priceText, setPriceText] = useState('');                  // entry fee as typed, in dollars ('' = free)
+    const [previewUri, setPreviewUri] = useState<string | null>(null);  // preview photo on the phone, uploaded on submit (null = none)
     const [coordinate, setCoordinate] = useState(startCoordinate);   // the spot under the pin
     const [radiusM, setRadiusM] = useState(DEFAULT_RADIUS_M);        // entries must be taken within this many meters of the pin
     const [startAt, setStartAt] = useState(getChallengeDate());      // first day of the challenge, YYYY-MM-DD (starts as today)
@@ -101,6 +106,7 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
         setDescription('');
         setMediaType('photo');
         setPriceText('');
+        setPreviewUri(null);
         setCoordinate(startCoordinate);
         setRadiusM(DEFAULT_RADIUS_M);
         setStartAt(getChallengeDate());
@@ -113,14 +119,44 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
         else resetForm();
     }
 
+    // KEY HANDLER: PICK A PREVIEW PHOTO
+    //   Opens the phone's photo library. No permission request: the system picker hands back
+    //   only the photo chosen, so neither iOS nor Android asks for library access first.
+    //   allowsEditing is what makes this safe to store: the editor returns a JPEG, so an
+    //   iPhone's HEIC originals never reach a bucket that doesn't accept them.
+    const pickPreview = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                aspect: [4, 3],     // the shape of the card the photo ends up in
+                quality: 0.8,       // smaller files, no visible difference on a card
+            });
+            if (result.canceled) return;
+
+            // Refuse anything storage would reject, while the user can still pick another
+            const picked = result.assets[0];
+            if (!getPreviewFile(picked.uri)) {
+                Alert.alert('Unsupported photo', 'A preview photo must be a JPEG, PNG or WebP image.');
+                return;
+            }
+            setPreviewUri(picked.uri);
+        } catch (err: any) {
+            Alert.alert('Could not open your photos', err?.message ?? 'Something went wrong. Please try again.');
+        }
+    }
+
     // KEY HANDLER: SUBMIT
     const submit = async () => {
         if (isSubmitting) return;
         setIsSubmitting(true);
         try {
-            // STEP 1: Save the challenge
+            // STEP 1: Save the challenge, uploading the preview photo if one was picked
             //   priceCents is null only while the field is mid-edit, which isDetailsValid blocks
-            const created = await createChallenge({title, description, ...coordinate, radius_m: radiusM, start_at: startAt, end_at: endAt, media_type: mediaType, price_cents: priceCents ?? 0});
+            const created = await createChallenge(
+                {title, description, ...coordinate, radius_m: radiusM, start_at: startAt, end_at: endAt, media_type: mediaType, price_cents: priceCents ?? 0},
+                previewUri,
+            );
 
             // STEP 2: Confirm success
             Alert.alert('Challenge created', `"${created.title}" is now live on the map.`);
@@ -166,6 +202,32 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
                         maxLength={500}
                     />
                     <Text style={styles.hint}>{description.length}/500</Text>
+
+                    <Text style={styles.label}>Preview photo</Text>
+                    {previewUri ? (
+                        <>
+                            <Image
+                                source={{uri: previewUri}}
+                                style={styles.previewImage}
+                                contentFit="cover"
+                                accessibilityLabel="Chosen preview photo"
+                            />
+                            <View style={styles.previewActions}>
+                                <Pressable accessibilityRole="button" style={styles.previewAction} onPress={pickPreview}>
+                                    <Text style={styles.previewActionText}>Change photo</Text>
+                                </Pressable>
+                                <Pressable accessibilityRole="button" style={styles.previewAction} onPress={() => setPreviewUri(null)}>
+                                    <Text style={[styles.previewActionText, styles.previewActionRemove]}>Remove</Text>
+                                </Pressable>
+                            </View>
+                        </>
+                    ) : (
+                        <Pressable accessibilityRole="button" accessibilityLabel="Add a preview photo" style={styles.previewPicker} onPress={pickPreview}>
+                            <Ionicons name="image-outline" size={22} color={colors.inactive} />
+                            <Text style={styles.previewPickerText}>Add a photo</Text>
+                        </Pressable>
+                    )}
+                    <Text style={styles.hint}>Optional. Shown on the challenge’s card on the map, so people can see the spot.</Text>
 
                     <Text style={styles.label}>Entry fee</Text>
                     <TextInput
@@ -248,6 +310,11 @@ export default function CreateChallengeForm({fixedCoordinate, onCreated, onCance
 
                 <Text style={styles.label}>Description</Text>
                 <Text style={styles.reviewValue}>{description.trim()}</Text>
+
+                <Text style={styles.label}>Preview photo</Text>
+                {previewUri
+                    ? <Image source={{uri: previewUri}} style={styles.previewImage} contentFit="cover" accessibilityLabel="Chosen preview photo" />
+                    : <Text style={styles.reviewValue}>None</Text>}
 
                 <Text style={styles.label}>Entry fee</Text>
                 <Text style={styles.reviewValue}>{priceCents ? formatPrice(priceCents) : 'Free'}</Text>

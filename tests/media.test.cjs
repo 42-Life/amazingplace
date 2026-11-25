@@ -39,6 +39,31 @@ test('size limit matches the videos bucket (50 MiB)', () => {
     assert.equal(MAX_VIDEO_BYTES, 52428800);
 });
 
+const {getPreviewFile, MAX_PREVIEW_BYTES} = require('../src/utils/media.ts');
+
+test('preview photos upload as the format they were picked in', () => {
+    assert.deepEqual(getPreviewFile('file:///tmp/ImagePicker/abc.jpg'), {extension: 'jpg', contentType: 'image/jpeg'});
+    assert.deepEqual(getPreviewFile('file:///tmp/abc.JPEG'), {extension: 'jpg', contentType: 'image/jpeg'});
+    assert.deepEqual(getPreviewFile('file:///tmp/abc.png'), {extension: 'png', contentType: 'image/png'});
+    assert.deepEqual(getPreviewFile('file:///tmp/abc.webp'), {extension: 'webp', contentType: 'image/webp'});
+});
+
+test('formats the previews bucket refuses are rejected before uploading', () => {
+    assert.equal(getPreviewFile('file:///tmp/IMG_0001.heic'), null);   // an iPhone original, if the editor is ever skipped
+    assert.equal(getPreviewFile('file:///tmp/clip.mp4'), null);
+    assert.equal(getPreviewFile('file:///tmp/photo'), null);
+    assert.equal(getPreviewFile('file:///tmp.dir/photo'), null);
+});
+
+test('query strings and fragments are ignored when reading a photo extension', () => {
+    assert.equal(getPreviewFile('file:///tmp/abc.png?token=1.heic').extension, 'png');
+    assert.equal(getPreviewFile('file:///tmp/abc.png#1').extension, 'png');
+});
+
+test('preview size limit matches the challenge-previews bucket (5 MiB)', () => {
+    assert.equal(MAX_PREVIEW_BYTES, 5242880);
+});
+
 const {getRecordedDurationMs, formatDuration, MAX_RECORDING_BYTES} = require('../src/utils/media.ts');
 
 test('recorded length prefers the recorder progress over elapsed time', () => {

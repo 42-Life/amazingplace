@@ -6,6 +6,7 @@
 import TextInput from '@/components/KeyboardTextInput';
 // React/Expo
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import * as Location from 'expo-location';
 import { LocationAccuracy } from 'expo-location';
 import { router } from 'expo-router';
@@ -20,6 +21,7 @@ import ChallengeList from '@/components/explore/ChallengeList';
 import { challengeMapMarkersStyles, challengeListStyles as styles } from "@/constants/styles";
 import { theme } from "@/constants/theme";
 import { ChallengeLocation } from "@/constants/types";
+import { getPreviewUrl } from "@/lib/challenge-previews";
 import { fetchChallenges } from "@/lib/challenges";
 import { filterChallengesByStartDate, searchChallengesByName, type ChallengeStartDateFilter } from '@/lib/filter';
 import { getChallengeDate } from '@/utils/challenge-dates';
@@ -344,8 +346,20 @@ export default function ExploreScreen() {
         // Hidden while a new challenge is being written, so the two popups can't overlap
         if (!selectedLocation || draftCoordinate) return null;
 
+        // Only challenges whose creator added a preview photo have one to show
+        const previewUrl = getPreviewUrl(selectedLocation.preview_path);
+
         return(
             <View style={[challengeMapMarkersStyles.card, {backgroundColor: colors.background}]}>
+                {previewUrl ? (
+                    <Image
+                        source={{uri: previewUrl}}
+                        style={challengeMapMarkersStyles.cardImage}
+                        contentFit="cover"
+                        transition={200}
+                        accessibilityLabel={`Preview photo for ${selectedLocation.title}`}
+                    />
+                ) : null}
                 <Text style={[challengeMapMarkersStyles.cardTitle, {color: colors.text}]}>{selectedLocation.title}</Text>
                 <Text style={[challengeMapMarkersStyles.cardBody, {color: colors.text}]}>{selectedLocation.description}</Text>
                 <Pressable

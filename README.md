@@ -88,6 +88,30 @@ Editing rules are checked in `src/lib/challenges.ts` and by a database trigger. 
 
 Run the edit validation tests with `npm test`. The permission checks in `tests/challenge-management.sql` are for a disposable database with the project schema applied; they create test accounts and roll back all changes.
 
+## Preview photos
+
+A challenge can carry one optional preview photo, picked from the creator's photo library on
+step 1 of the New Challenge form. It's what the card on the map shows when someone taps the pin,
+so people can see the spot before opening the challenge. A challenge without one looks exactly
+as it did before.
+
+- The photo goes in the **`challenge-previews`** storage bucket, under `<auth user id>/`, which is
+  the only folder the storage policies let a user write to. The challenge row keeps its path in
+  `challenges.preview_path` (null means no preview).
+- It's uploaded in `createChallenge`, after every other check has passed, so a form that gets
+  rejected never leaves a photo behind. If the insert then fails, the file is deleted.
+- The bucket takes JPEG, PNG and WebP up to 5 MiB. The picker opens with `allowsEditing`, and the
+  editor hands back a JPEG — that's what keeps an iPhone's HEIC originals, which the bucket would
+  refuse, from ever being picked. `getPreviewFile` in `src/utils/media.ts` checks the format
+  anyway, before the file is read.
+- A preview is **not** a submission: nothing checks where it was taken, and it never appears in
+  the entries grid. That's why it lives in `src/lib/challenge-previews.ts` rather than in
+  `src/lib/photos.ts`.
+
+Previews can't be changed after creation yet — the Managing view doesn't offer it. Nothing in the
+database stops it (`preview_path` isn't one of the frozen columns in `validate_challenge_edit`),
+so adding it is an edit-form change, not a migration.
+
 ## Paid challenges (Stripe)
 
 A challenge can have an entry fee. Free challenges (`price_cents = 0`) work exactly as before

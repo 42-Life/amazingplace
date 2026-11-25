@@ -38,6 +38,7 @@ export type ChallengeLocation = {
     radius_m: number        // photos and videos must be taken within this many meters of the pin
     media_type: MediaType   // whether entries are photos or videos
     price_cents: number     // entry fee in cents (0 = free). Stored in cents so no rounding can lose a penny
+    preview_path: string | null   // optional preview photo, as its path in the "challenge-previews" bucket (null = none)
 }
 
 // Where a photo or video was taken
