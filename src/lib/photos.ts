@@ -38,6 +38,11 @@ export class SubmissionError extends Error {}
 export class CaptureLocationError extends SubmissionError {}
 
 
+// TEMPORARY: radius check is turned off, so entries are accepted from anywhere.
+//   Set back to true to require photos/videos to be taken inside the challenge's circle again.
+const ENFORCE_CAPTURE_RADIUS = false;
+
+
 // CHECK CAPTURE LOCATION
 // Makes sure the photo or video was taken inside the challenge's circle. Throws CaptureLocationError if not.
 //   'asserts' tells TypeScript the location is known after this returns
@@ -46,9 +51,11 @@ export function checkCaptureLocation(
     location: PhotoLocation | null,
     mediaType: MediaType = 'photo',
 ): asserts location is PhotoLocation {
+    // A location is still required: the database stores where every entry was taken
     if (!location) {
         throw new CaptureLocationError(`We don't know where this ${mediaType} was taken, so it can't be entered. Turn on location and try again.`);
     }
+    if (!ENFORCE_CAPTURE_RADIUS) return;
     const distance = distanceInMeters(challenge, location);
     if (distance > challenge.radius_m) {
         throw new CaptureLocationError(
