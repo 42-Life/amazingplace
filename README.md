@@ -123,7 +123,8 @@ and never touch Stripe.
    as whole cents, and can't be changed afterwards (a database trigger refuses it).
 2. On a paid challenge, the button on the challenge screen reads "Pay $5.00 to enter".
    Tapping it calls the `create-entry-payment` edge function, which creates a Stripe
-   PaymentIntent and opens Stripe's payment sheet.
+   PaymentIntent and opens Stripe's payment sheet. It refuses unless the challenge is in
+   its entry phase, so nobody is charged for a challenge they can't submit to yet.
 3. When the payment succeeds, Stripe calls the `stripe-webhook` edge function, which marks
    that person's row in `challenge_entries` as `paid`. **Only the webhook does this** — the
    app can't, which is why a user can't grant themselves entry.
@@ -134,6 +135,11 @@ Two rules hold this together, and both are worth keeping:
 
 - **The amount comes from the database, never from the app.** The app sends a challenge id and
   nothing else, so a tampered request can't buy a $20 challenge for 50¢.
+- **One definition of "now".** The edge function calls `challenge_phase()` rather than working
+  the date out itself. It's the same function the `submissions` insert policy uses, so paying
+  and submitting can't disagree — including about time zones, since the database counts days
+  in America/New_York while a date built in an edge function would be UTC.
+
 - **The secret key lives only in the edge functions.** The app holds the publishable key
   (`pk_`), which can start payments and nothing else. If you ever find an `sk_` or `rk_` key
   under `src/`, it's in the wrong place — roll it in the Stripe dashboard.

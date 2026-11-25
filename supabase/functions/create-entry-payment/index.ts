@@ -54,7 +54,7 @@ Deno.serve(async (request: Request) => {
         // STEP 4: Read the challenge, and take the price from here rather than from the request
         const {data: challenge, error: challengeError} = await admin
             .from('challenges')
-            .select('id, title, price_cents, creator_account_id, end_at')
+            .select('id, title, price_cents, creator_account_id')
             .eq('id', challengeId)
             .maybeSingle();
         if (challengeError) throw challengeError;
@@ -63,8 +63,20 @@ Deno.serve(async (request: Request) => {
         // STEP 5: Reasons there is nothing to pay for
         if (challenge.price_cents === 0) return jsonResponse({error: 'This challenge is free to enter.'}, 400);
         if (challenge.creator_account_id === account.id) return jsonResponse({error: 'You created this challenge.'}, 400);
-        if (challenge.end_at < new Date().toISOString().slice(0, 10)) {
-            return jsonResponse({error: 'This challenge has ended.'}, 400);
+
+        // STEP 5b: Entries are only accepted during the entry phase, so that is the only time
+        //   there is anything worth buying. Ask the database rather than working the date out
+        //   here: challenge_phase is the same function the submissions policy uses, so paying
+        //   and submitting can never disagree. It also settles the time zone — the database
+        //   counts days in America/New_York, while a date made here would be in UTC and would
+        //   roll over to tomorrow at 7pm on the challenge's last evening.
+        const {data: phase, error: phaseError} = await admin.rpc('challenge_phase', {p_challenge_id: challenge.id});
+        if (phaseError) throw phaseError;
+        if (phase !== 'entry') {
+            const reason = phase === 'upcoming' ? 'This challenge has not opened for entries yet.'
+                : phase === 'voting' ? 'Entries have closed for this challenge.'
+                : 'This challenge is over.';
+            return jsonResponse({error: reason}, 400);
         }
 
         // STEP 6: Already paid? Say so instead of charging twice.
@@ -148,19 +160,48 @@ Deno.serve(async (request: Request) => {
         }
 
         // STEP 11: Record the attempt as pending. The webhook, not the app, turns it into 'paid'.
-        //   onConflict: the same person retrying a challenge updates their one row.
-        const {error: upsertError} = await admin
-            .from('challenge_entries')
-            .upsert({
-                account_id: account.id,
-                challenge_id: challenge.id,
-                stripe_payment_intent_id: paymentIntent.id,
-                amount_cents: challenge.price_cents,
-                currency: 'usd',
-                status: 'pending',
-                paid_at: null,
-            }, {onConflict: 'account_id,challenge_id'});
-        if (upsertError) throw upsertError;
+        //   Never write over a row that is already 'paid'. The webhook can land at any moment,
+        //   including between step 6 reading this row and this write — and a 'paid' row is the
+        //   record of real money, so turning it back into 'pending' would lock someone out of
+        //   what they just bought. Both branches below hand that case straight back as paid.
+        const attempt = {
+            account_id: account.id,
+            challenge_id: challenge.id,
+            stripe_payment_intent_id: paymentIntent.id,
+            amount_cents: challenge.price_cents,
+            currency: 'usd',
+            status: 'pending',
+            paid_at: null,
+        };
+
+        if (existingEntry) {
+            //   neq('status', 'paid'): the update matches nothing if the webhook got there first
+            const {data: updated, error: updateError} = await admin
+                .from('challenge_entries')
+                .update(attempt)
+                .eq('id', existingEntry.id)
+                .neq('status', 'paid')
+                .select('id')
+                .maybeSingle();
+            if (updateError) throw updateError;
+            if (!updated) return jsonResponse({alreadyPaid: true});
+        } else {
+            const {error: insertError} = await admin.from('challenge_entries').insert(attempt);
+            //   23505 means the webhook inserted the row in the moment since step 6 looked.
+            //   Read it back rather than assuming which of the two states it is in.
+            if (insertError?.code === '23505') {
+                const {data: raced, error: rereadError} = await admin
+                    .from('challenge_entries')
+                    .select('status')
+                    .eq('account_id', account.id)
+                    .eq('challenge_id', challenge.id)
+                    .maybeSingle();
+                if (rereadError) throw rereadError;
+                if (raced?.status === 'paid') return jsonResponse({alreadyPaid: true});
+            } else if (insertError) {
+                throw insertError;
+            }
+        }
 
         // STEP 12: Hand the app what the payment sheet needs. These are all client-safe:
         //   the client secret only unlocks this one payment, and the session expires.

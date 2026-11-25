@@ -59,6 +59,23 @@ Deno.serve(async (request: Request) => {
                 const intent = event.data.object;
                 const {account_id, challenge_id} = intent.metadata ?? {};
 
+                // No metadata means this intent wasn't made by create-entry-payment — a test
+                // charge from the dashboard, say. Match on the intent id instead, which is
+                // unique in this table, so a payment of ours still lands if its metadata was
+                // ever lost. If nothing matches it isn't ours: answer 200, because throwing
+                // here would have Stripe retrying an event we can never act on.
+                if (!account_id || !challenge_id) {
+                    const {data: matched, error: matchError} = await admin
+                        .from('challenge_entries')
+                        .update({status: 'paid', paid_at: new Date().toISOString()})
+                        .eq('stripe_payment_intent_id', intent.id)
+                        .select('id')
+                        .maybeSingle();
+                    if (matchError) throw matchError;
+                    if (!matched) console.error('Ignoring payment_intent.succeeded with no matching entry:', intent.id);
+                    break;
+                }
+
                 // upsert, not update: Stripe can deliver this before the app's own response
                 // lands, and a retry must not depend on the pending row already existing.
                 const {error} = await admin
