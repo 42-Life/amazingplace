@@ -4,7 +4,8 @@
 // KEY IMPORTS
 import { supabase } from '@/lib/supabase';
 import { fetchMyAccount } from '@/lib/accounts';
-import {getChallengeDate} from '@/utils/challenge-dates';
+import { fetchAllRows } from '@/lib/fetch-all-rows';
+import {formatChallengeDate, getChallengeDate, getChallengePhase} from '@/utils/challenge-dates';
 import {distanceInMeters} from '@/utils/distance';
 import {getVideoFile, isValidVideoDuration, MAX_VIDEO_BYTES} from '@/utils/media';
 import type {ChallengeLocation, MediaType, PhotoLocation} from '@/constants/types';
@@ -69,8 +70,12 @@ export async function uploadSubmission(
     const challengeId = challenge.id;
     const {mediaType, uri} = capture;
 
-    // STEP 0: Stop before uploading anything if the challenge wants the other kind of entry,
-    //   or if it was taken outside the challenge area. The database checks the type too.
+    // STEP 0: Stop before uploading anything if entries aren't open (e.g. the camera stayed open past midnight
+    //   on the last day), if the challenge wants the other kind of entry, or if it was taken outside the
+    //   challenge area. The database checks the dates and the type too.
+    const phase = getChallengePhase(challenge);
+    if (phase === 'upcoming') throw new SubmissionError(`Entries open on ${formatChallengeDate(challenge.start_at)}.`);
+    if (phase !== 'entry') throw new SubmissionError(`Entries closed on ${formatChallengeDate(challenge.end_at)}.`);
     if (mediaType !== challenge.media_type) {
         throw new SubmissionError(`This challenge only accepts ${challenge.media_type}s.`);
     }
@@ -185,6 +190,88 @@ export async function fetchChallengeSubmissions(challengeId: string): Promise<{p
     return {photos, total: count ?? photos.length};
 }
 
+// FETCH ONE SUBMISSION
+// The submission shown on the submission page, or null if it has been deleted.
+// Includes its challenge, which voting needs (a vote is one per account per challenge).
+// challengeSchedule: the challenge's dates, so the submission page knows whether voting is open
+export type SubmissionDetail = SubmissionPhoto & {
+    challengeId: string;
+    challengeSchedule: Pick<ChallengeLocation, 'start_at' | 'end_at' | 'voting_end_at'>;
+};
+
+export async function fetchSubmissionById(submissionId: string): Promise<SubmissionDetail | null> {
+    const account = await fetchMyAccount();
+    const {data: row, error} = await supabase
+        .from('submissions')
+        .select('id, challenge_id, image_path, media_type, duration_ms, created_at, account_id, accounts(username), challenges(start_at, end_at, voting_end_at)')
+        .eq('id', submissionId)
+        .maybeSingle()
+        .overrideTypes<{
+            id: string;
+            challenge_id: string;
+            image_path: string;
+            media_type: MediaType;
+            duration_ms: number | null;
+            created_at: string;
+            account_id: string;
+            accounts: {username: string} | null;
+            challenges: Pick<ChallengeLocation, 'start_at' | 'end_at' | 'voting_end_at'>;
+        }, {merge: false}>();
+    if (error) throw error;
+    if (!row) return null;
+    return {
+        id: row.id,
+        challengeId: row.challenge_id,
+        challengeSchedule: row.challenges,
+        imageUrl: getMediaUrl(row.media_type, row.image_path),
+        mediaType: row.media_type,
+        durationMs: row.duration_ms,
+        createdAt: row.created_at,
+        username: row.accounts?.username ?? 'unknown',
+        isOwn: row.account_id === account?.id,
+    };
+}
+
+// SUBMISSION STATS ROW
+// What the stats page needs from each submission: who made it, when, and its file for the top 3
+export type SubmissionStatsRow = Pick<Submission, 'id' | 'imageUrl' | 'mediaType' | 'durationMs' | 'createdAt'> & {
+    accountId: string
+    username: string
+};
+
+// FETCH SUBMISSION STATS ROWS
+// Every submission in one challenge, oldest first. Used by the stats page (src/lib/challenge-stats.ts).
+//   All of them, not just the first 1000, since the chart and totals count every one
+export async function fetchSubmissionStatsRows(challengeId: string): Promise<SubmissionStatsRow[]> {
+    type Row = {
+        id: string;
+        image_path: string;
+        media_type: MediaType;
+        duration_ms: number | null;
+        created_at: string;
+        account_id: string;
+        accounts: {username: string} | null;
+    };
+    const rows = await fetchAllRows<Row>((from, to) => supabase
+        .from('submissions')
+        .select('id, image_path, media_type, duration_ms, created_at, account_id, accounts(username)')
+        .eq('challenge_id', challengeId)
+        .order('created_at', {ascending: true})
+        .order('id', {ascending: true})   // tie-breaker, so the pages never overlap
+        .range(from, to)
+        .overrideTypes<Row[], {merge: false}>());
+
+    return rows.map((row) => ({
+        id: row.id,
+        imageUrl: getMediaUrl(row.media_type, row.image_path),
+        mediaType: row.media_type,
+        durationMs: row.duration_ms,
+        createdAt: row.created_at,
+        accountId: row.account_id,
+        username: row.accounts?.username ?? 'unknown',
+    }));
+}
+
 // FETCH MY SUBMISSIONS
 // Gets every photo and video the signed-in user has submitted, newest first (used by the gallery)
 export async function fetchMySubmissions(): Promise<Submission[]> {
@@ -197,7 +284,7 @@ export async function fetchMySubmissions(): Promise<Submission[]> {
     const {data, error} = await supabase
         .from('submissions')
         .select('id, image_path, media_type, duration_ms, created_at, challenges!inner(title)')
-        .gte('challenges.end_at', getChallengeDate())
+        .gte('challenges.voting_end_at', getChallengeDate())
         .eq('account_id', account.id)
         .order('created_at', {ascending: false});
 

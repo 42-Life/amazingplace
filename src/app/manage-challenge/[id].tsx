@@ -21,11 +21,19 @@ export default function ManageChallengeScreen() {
         return () => {active = false;};
     }, [id, revision]);
 
-    if (challenge) return <EditChallengeForm key={challenge.id} challenge={challenge} onClose={() => router.back()} />;
+    // Saving goes back to the stats page. Deleting skips past it (its challenge is gone) to the Create tab.
+    if (challenge) return (
+        <EditChallengeForm
+            key={challenge.id}
+            challenge={challenge}
+            onClose={() => router.back()}
+            onDeleted={() => router.dismissTo('/challenges')}
+        />
+    );
 
     return (
         <SafeAreaView style={styles.safe}>
-            <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.button}><Text style={styles.text}>Back to dashboard</Text></Pressable>
+            <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.button}><Text style={styles.text}>Back</Text></Pressable>
             <View style={styles.center}>
                 {error ? <>
                     <Text style={styles.text} accessibilityRole="alert">{error}</Text>

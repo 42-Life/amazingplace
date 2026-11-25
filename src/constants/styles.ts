@@ -18,6 +18,7 @@ export const screenShellStyles = StyleSheet.create({
 
 const {colors} = theme;
 
+// TODO: Participation tag shouldn't be hard coded, should reference themes
 export const challengeListStyles = StyleSheet.create({
     fill: {flex: 1, backgroundColor: colors.background},
     searchBar: {
@@ -26,7 +27,7 @@ export const challengeListStyles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', gap: 8,
         backgroundColor: colors.background,
         borderWidth: 1, borderColor: colors.tabBarBorder,
-        shadowColor: '#000000', shadowOffset: {width: 0, height: 2},
+        shadowColor: colors.shadow, shadowOffset: {width: 0, height: 2},
         shadowOpacity: 0.15, shadowRadius: 4, elevation: 4,
     },
     searchInput: {flex: 1, minWidth: 0, height: '100%', paddingVertical: 0, fontSize: 16, color: colors.text},
@@ -37,7 +38,7 @@ export const challengeListStyles = StyleSheet.create({
         alignItems: 'center', justifyContent: 'center',
         backgroundColor: colors.background,
         borderWidth: 1, borderColor: colors.tabBarBorder,
-        shadowColor: '#000000', shadowOffset: {width: 0, height: 2},
+        shadowColor: colors.shadow, shadowOffset: {width: 0, height: 2},
         shadowOpacity: 0.15, shadowRadius: 4, elevation: 4,
     },
     filterButton: {right: 136},
@@ -52,7 +53,7 @@ export const challengeListStyles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
         backgroundColor: colors.background,
         borderWidth: 1, borderColor: colors.tabBarBorder,
-        shadowColor: '#000000', shadowOffset: {width: 0, height: 2},
+        shadowColor: colors.shadow, shadowOffset: {width: 0, height: 2},
         shadowOpacity: 0.15, shadowRadius: 4, elevation: 4,
     },
     clearResultsText: {fontSize: 15, fontWeight: '600', color: colors.text},
@@ -68,6 +69,9 @@ export const challengeListStyles = StyleSheet.create({
     cardBody: {flex: 1, gap: 6},
     rowsContent: {gap: 0},
     row: {paddingVertical: 16, flexDirection: 'row'},
+    // Title with the row layout's arrow beside it; the title wraps before reaching the arrow
+    titleRow: {flexDirection: 'row', alignItems: 'center', gap: 8},
+    titleText: {flex: 1},
     separator: {height: StyleSheet.hairlineWidth, backgroundColor: colors.inactive},
     title: {fontSize: 18, fontWeight: '700', color: colors.text},
     description: {fontSize: 15, lineHeight: 22, color: colors.inactive},
@@ -95,12 +99,20 @@ export const challengeFilterStyles = StyleSheet.create({
     dateButton: {flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10},
     dateText: {flex: 1, fontSize: 16, color: colors.text},
     dateDone: {alignSelf: 'flex-end', minHeight: 44, paddingHorizontal: 16, justifyContent: 'center'},
-    error: {fontSize: 14, color: '#B91C1C'},
+
+    chipRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
+    chip: {minHeight: 40, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 20, borderWidth: 1, borderColor: colors.tabBarBorder},
+    chipSelected: {backgroundColor: colors.activePressed, borderColor: colors.activePressed},
+    chipDisabled: {opacity: 0.4},
+    chipText: {fontSize: 15, fontWeight: '600', color: colors.text},
+    chipTextSelected: {color: colors.whiteText},
+
+    error: {fontSize: 14, color: colors.danger},
     actions: {flexDirection: 'row', gap: 12, marginTop: 12},
     reset: {flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: colors.tabBarBorder},
     resetText: {fontSize: 15, fontWeight: '600', color: colors.text},
-    apply: {flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.text},
-    applyText: {fontSize: 15, fontWeight: '600', color: colors.background},
+    apply: {flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.active},
+    applyText: {fontSize: 15, fontWeight: '600', color: colors.whiteText},
 });
 
 export const challengeMapMarkersStyles = StyleSheet.create({
@@ -109,13 +121,14 @@ export const challengeMapMarkersStyles = StyleSheet.create({
         height: 18,
         borderRadius: 9,
         borderWidth: 3,
-        borderColor: '#FFFFFF',
+        borderColor: colors.background,
     },
 
     dotSelected: {
         width: 24,
         height: 24,
         borderRadius: 12,
+        borderColor: colors.background,
     },
 
     card: {
@@ -134,7 +147,7 @@ export const challengeMapMarkersStyles = StyleSheet.create({
         width: '100%',
         height: 140,
         borderRadius: 12,
-        backgroundColor: '#E5E7EB',   // fills the frame while the photo loads
+        backgroundColor: colors.surfaceMuted,   // fills the frame while the photo loads
     },
 
     button: {
@@ -143,13 +156,13 @@ export const challengeMapMarkersStyles = StyleSheet.create({
         borderRadius: 10,
         alignItems: 'center',
     },
-    buttonText: {color: '#FFFFFF', fontWeight: '600'},
+    buttonText: {color: colors.background, fontWeight: '600'},
 })
 
 export const photoCaptureStyles = StyleSheet.create({
-    fill: {flex: 1, backgroundColor: '#000000'},
+    fill: {flex: 1, backgroundColor: colors.shadow},
     center: {alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16},
-    message: {color: '#FFFFFF', fontSize: 16, textAlign: 'center'},
+    message: {color: colors.background, fontSize: 16, textAlign: 'center'},
 
     // Row of three controls along the bottom, evenly spaced.
     controls: {
@@ -177,11 +190,11 @@ export const photoCaptureStyles = StyleSheet.create({
         height: 76,
         borderRadius: 38,
         borderWidth: 4,
-        borderColor: '#FFFFFF',
+        borderColor: colors.background,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    shutterCenter: {width: 58, height: 58, borderRadius: 29, backgroundColor: '#FFFFFF'},
+    shutterCenter: {width: 58, height: 58, borderRadius: 29, backgroundColor: colors.background},
 
     previewButtons: {
         position: 'absolute',
@@ -193,7 +206,7 @@ export const photoCaptureStyles = StyleSheet.create({
     },
     textButton: {paddingVertical: 12, paddingHorizontal: 24, borderRadius: 24},
     secondary: {backgroundColor: 'rgba(0,0,0,0.55)'},
-    textButtonLabel: {color: '#FFFFFF', fontWeight: '600', fontSize: 16},
+    textButtonLabel: {color: colors.background, fontWeight: '600', fontSize: 16},
 
     // Sheet that slides up from the bottom to choose which challenge to submit to
     chooserSheet: {
@@ -224,8 +237,8 @@ export const photoCaptureStyles = StyleSheet.create({
     chooserCancelText: {fontSize: 15, fontWeight: '600', color: theme.colors.inactive},
 
     // Video camera: red record button (a dot that becomes a stop square while recording)
-    recordDot: {width: 58, height: 58, borderRadius: 29, backgroundColor: '#EF4444'},
-    recordStop: {width: 28, height: 28, borderRadius: 6, backgroundColor: '#EF4444'},
+    recordDot: {width: 58, height: 58, borderRadius: 29, backgroundColor: colors.record},
+    recordStop: {width: 28, height: 28, borderRadius: 6, backgroundColor: colors.record},
 
     // Video camera: timer pill at the top, red while recording
     timer: {
@@ -239,8 +252,8 @@ export const photoCaptureStyles = StyleSheet.create({
         borderRadius: 16,
         backgroundColor: 'rgba(0,0,0,0.55)',
     },
-    timerRecording: {backgroundColor: '#EF4444'},
-    timerText: {color: '#FFFFFF', fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums']},
+    timerRecording: {backgroundColor: colors.record},
+    timerText: {color: colors.record, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums']},
 
     // Video camera: small note above the controls (e.g. recording without sound)
     notice: {
@@ -248,7 +261,7 @@ export const photoCaptureStyles = StyleSheet.create({
         left: 24,
         right: 24,
         bottom: 120,
-        color: '#FFFFFF',
+        color: colors.background,
         fontSize: 14,
         textAlign: 'center',
         textShadowColor: 'rgba(0,0,0,0.8)',
@@ -367,7 +380,7 @@ export const createChallengeStyles = StyleSheet.create({
     },
     // Same line as the hint, in red, when what was typed can't be used
     errorHint: {
-        color: '#B91C1C',
+        color: colors.danger,
     },
 
 
@@ -422,7 +435,7 @@ export const createChallengeStyles = StyleSheet.create({
         width: '100%',
         height: 180,
         borderRadius: 10,
-        backgroundColor: colors.tabBarBorder,   // fills the frame while the photo loads
+        backgroundColor: colors.surfaceMuted,   // fills the frame while the photo loads
     },
     previewActions: {
         flexDirection: 'row',
@@ -443,7 +456,7 @@ export const createChallengeStyles = StyleSheet.create({
         color: colors.text,
     },
     previewActionRemove: {
-        color: '#B91C1C',
+        color: colors.danger,
     },
 
     // Step 2: map with a pin locked to the centre
@@ -520,7 +533,7 @@ export const createChallengeStyles = StyleSheet.create({
     buttonText: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#FFFFFF',
+        color: colors.whiteText,
     },
     buttonTextSecondary: {
         color: colors.text,
@@ -583,6 +596,9 @@ export const challengeDetailStyles = StyleSheet.create({
     paymentError: {fontSize: 14, color: '#B91C1C'},
     paymentNote: {fontSize: 13, color: colors.inactive, textAlign: 'center'},
 
+    // Shown in place of the enter button outside the entry period (e.g. "Entries are closed. Voting ends Dec 10")
+    phaseNote: {fontSize: 15, lineHeight: 21, color: colors.text, textAlign: 'center', paddingVertical: 8},
+
     // Back button row across the top
     header: {
         flexDirection: 'row',
@@ -617,7 +633,7 @@ export const userLocationMarkerStyles = {
     borderRadius: 11,
     backgroundColor: colors.userLocationColor,
     borderWidth: 3,
-    borderColor: colors.background,
+    borderColor: colors.whiteText,
 
     shadowColor: '#000',
     shadowOpacity: 0.3,
@@ -625,3 +641,77 @@ export const userLocationMarkerStyles = {
     shadowOffset: {width: 0, height: 1},
     elevation: 4,
 }
+
+//  Sorting styling
+export const sortStyles = StyleSheet.create({
+    container: {
+        marginBottom: 12,
+    },
+    dropdown: {
+        minHeight: 48,
+        paddingHorizontal: 14,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: theme.colors.tabBarBorder,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: theme.colors.tabBarBorder,
+        gap: 10,
+    },
+    dropdownText: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: '600',
+        color: theme.colors.inactive,
+    },
+    activeText: {
+        color: theme.colors.text,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        justifyContent: 'center',
+        padding: 24,
+    },
+    modalContent: {
+        backgroundColor: theme.colors.background,
+        borderRadius: 16,
+        padding: 16,
+        maxHeight: '80%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingBottom: 12,
+        marginBottom: 4,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: theme.colors.inactive,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: theme.colors.text,
+    },
+    option: {
+        minHeight: 48,
+        paddingVertical: 12,
+        paddingHorizontal: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderRadius: 8,
+    },
+    selectedOption: {
+        backgroundColor: theme.colors.surfaceMuted,
+    },
+    optionText: {
+        fontSize: 15,
+        color: theme.colors.text,
+    },
+    selectedOptionText: {
+        fontWeight: '700',
+        color: theme.colors.active,
+    },
+});

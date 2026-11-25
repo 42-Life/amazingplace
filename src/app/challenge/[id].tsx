@@ -26,6 +26,8 @@ import { useChallengeEntry } from '@/hooks/use-challenge-entry';
 import { fetchChallengeById } from '@/lib/challenges';
 import { isPaidChallenge } from '@/lib/payments';
 import { formatPrice } from '@/utils/price';
+import { describeChallengePhase, formatChallengeDate, getChallengePhase, getVotingClosedMessage, getVotingStartDate } from '@/utils/challenge-dates';
+import ChallengeTagPills from '@/components/ChallengeTagPill'
 
 
 // MAIN FUNCTION
@@ -79,6 +81,16 @@ export default function ChallengeScreen() {
     }, [id])   // re-runs if the user opens a different challenge
 
     const isVideoChallenge = challenge?.media_type === 'video';
+
+    // ENTRY OR VOTING?
+    //   Entries (and the camera) only during the entry period; votes only during the voting period.
+    //   The database enforces both, this just keeps the buttons honest.
+    const phase = challenge ? getChallengePhase(challenge) : null;
+    const phaseNote = !challenge ? null
+        : phase === 'upcoming' ? `Entries open ${formatChallengeDate(challenge.start_at)}. Voting opens ${formatChallengeDate(getVotingStartDate(challenge))}.`
+        : phase === 'voting' ? `Entries are closed. Double-tap a submission to vote for it, until the end of ${formatChallengeDate(challenge.voting_end_at)}.`
+        : phase === 'closed' ? `This challenge is over. Voting ended ${formatChallengeDate(challenge.voting_end_at)}.`
+        : null;
     const isPaid = challenge ? isPaidChallenge(challenge) : false;
 
     // Whether this user may submit yet, and how to let them pay if not
@@ -95,7 +107,7 @@ export default function ChallengeScreen() {
 
     // CAMERA: takes over the whole screen, locked to this challenge
     //   Video challenges get the video camera, photo challenges the photo camera
-    if (isCameraOpen && challenge) {
+    if (isCameraOpen && challenge && phase === 'entry') {
         const closeCamera = () => setIsCameraOpen(false);
         return isVideoChallenge
             ? <ChallengeVideoCamera challenge={challenge} onClose={closeCamera} />
@@ -121,8 +133,10 @@ export default function ChallengeScreen() {
                     <ChallengeSubmissionsGrid
                         key={challenge.id}
                         challengeId={challenge.id}
-                        header={(submissionCount) => <View style={styles.details}>
+                        votingClosedMessage={getVotingClosedMessage(challenge)}
+                        header={(submissionCount, voteCount) => <View style={styles.details}>
                             <Text style={styles.title}>{challenge.title}</Text>
+                            <ChallengeTagPills tags={challenge.tags} />
                             <View style={styles.tagRow}>
                                 <Text style={styles.submissionTag}>{isVideoChallenge ? 'Video challenge' : 'Photo challenge'}</Text>
                                 {isPaid && (
@@ -143,12 +157,20 @@ export default function ChallengeScreen() {
                                     {submissionCount === null ? 'Submissions: —' : `${submissionCount.toLocaleString()} ${submissionCount === 1 ? 'submission' : 'submissions'}`}
                                 </Text>
                             </View>
-                            <Text style={styles.areaTitle}>
-                                End date: {new Date(`${challenge.end_at}T12:00:00`).toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'})}
-                            </Text>
+                            <View style={styles.radiusRow}>
+                                <Text style={styles.areaTitle}>
+                                    {describeChallengePhase(challenge)}
+                                </Text>
+                                <Text style={styles.submissionTag} accessibilityLiveRegion="polite">
+                                    {voteCount === null ? 'Votes: —' : voteCount === 0 ? 'No votes yet' : `${voteCount.toLocaleString()} ${voteCount === 1 ? 'vote' : 'votes'}`}
+                                </Text>
+                            </View>
                         </View>}
                     />
                     <View style={styles.footer}>
+                        {phaseNote ? (
+                            <Text style={styles.phaseNote} accessibilityRole="text">{phaseNote}</Text>
+                        ) : <>
                         {entry.errorMessage && (
                             <Text style={styles.paymentError} accessibilityLiveRegion="polite">{entry.errorMessage}</Text>
                         )}
@@ -176,6 +198,7 @@ export default function ChallengeScreen() {
                         {isPaid && entry.hasAccess && !entry.isChecking && (
                             <Text style={styles.paymentNote}>Entry fee paid.</Text>
                         )}
+                        </>}
                     </View>
                 </>
             )}

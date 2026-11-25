@@ -33,10 +33,13 @@ export type ChallengeLocation = {
     description: string
     latitude: number
     longitude: number
+    // TODO: Add created_at property and link it to Supabase. Allows for sort by newest/oldest (created)
     start_at: string
-    end_at: string          // last day of the challenge, YYYY-MM-DD
+    end_at: string          // last day of the entry period, YYYY-MM-DD
+    voting_end_at: string   // last day of the voting period, YYYY-MM-DD (voting starts the day after end_at)
     radius_m: number        // photos and videos must be taken within this many meters of the pin
     media_type: MediaType   // whether entries are photos or videos
+    tags: ChallengeTagId[]
     price_cents: number     // entry fee in cents (0 = free). Stored in cents so no rounding can lose a penny
     preview_path: string | null   // optional preview photo, as its path in the "challenge-previews" bucket (null = none)
 }
@@ -71,3 +74,85 @@ export type Account = {
     username: string
     email: string
 }
+
+// One account's vote in a challenge (each account gets one vote per challenge)
+export type Vote = {
+    id: string
+    account_id: string
+    submission_id: string
+    challenge_id: string
+    created_at: string
+}
+
+// One comment under a submission, ready to display
+export type Comment = {
+    id: string
+    accountId: string
+    submissionId: string
+    body: string
+    createdAt: string
+    editedAt: string | null   // null if the text was never changed
+    username: string          // who wrote it
+    isOwn: boolean            // written by the signed-in user, so they may edit or delete it
+}
+
+// Challenge Tags
+export type ChallengeTagId =
+    | 'pranks_humor'
+    | 'dares_skits'
+    | 'everyday_life'
+    | 'nature_scenery'
+    | 'art_music'
+    | 'sports_fitness'
+    | 'photography'
+    | 'food_drink'
+    | 'animals_pets'
+    | 'scavenger_hunt'
+    | 'community_kindness'
+    | 'other';
+
+export type ChallengeTagProps = {
+    tags: readonly string[] | null | undefined;
+};
+
+export type ChallengeTagDefinition = {
+    id: ChallengeTagId;
+    label: string;
+    icon: ComponentProps<typeof Ionicons>['name'];
+    color: string;
+    // Option C: very subtle category tint mixed into a neutral grey pill.
+    backgroundColor: string;
+    // Option A: stronger category-specific tinted background.
+    optionABackgroundColor: string;
+};
+
+export type ChallengeTagPickerProps = {
+    value: ChallengeTagId[];
+    onChange: (next: ChallengeTagId[]) => void;
+    disabled?: boolean;
+};
+
+// Challenge Sort Types
+// CHALLENGE SORTING TYPES
+
+// The fields that challenges can be sorted by
+export type ChallengeSortField =
+    // | 'added'
+    // TODO: uncomment added once ChallengeLocation type & Supabase is updated to have a created_at field. Then implement sort by newest/oldest
+    | 'ending'
+    | 'duration'
+    | 'price';
+
+// The selected sorting field and direction
+export type ChallengeSort = {
+    field: ChallengeSortField;
+    direction: 'asc' | 'desc';
+};
+
+// An option displayed in the "Sort By..." dropdown
+export type ChallengeSortOption = {
+    field: ChallengeSortField;
+    direction: 'asc' | 'desc';
+    fieldLabel: string;
+    directionLabel: string;
+};

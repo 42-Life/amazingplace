@@ -10,6 +10,9 @@ create table public.submissions (
     duration_ms integer,
 
     constraint submissions_pkey primary key (id),
+    -- Lets votes point at (submission, challenge) together, so a vote's challenge_id
+    -- must be the challenge the submission actually belongs to.
+    constraint submissions_id_challenge_id_key unique (id, challenge_id),
     constraint submissions_challenge_id_fkey foreign key (challenge_id)
         references public.challenges (id) on delete cascade,
     constraint submissions_account_id_fkey foreign key (account_id)
@@ -31,6 +34,7 @@ create policy "Signed-in users can view submissions"
     to authenticated
     using (true);
 
+-- Submissions are only accepted during the entry period (see challenge_phase in functions.sql).
 -- Paid challenges only accept submissions from people who paid (and from the creator).
 -- Free challenges are unaffected: has_challenge_access returns true for them.
 create policy "users insert their own submissions"
@@ -39,6 +43,7 @@ create policy "users insert their own submissions"
     with check (
         account_id = public.current_account_id()
         and public.has_challenge_access(challenge_id, public.current_account_id())
+        and public.challenge_phase(challenge_id) = 'entry'
     );
 
 create policy "users delete their own submissions"

@@ -28,14 +28,67 @@ grant all on function public.current_account_id() to anon, authenticated, servic
 grant all on function public.handle_new_user() to anon, authenticated, service_role;
 
 -- Enforce edit rules on the server too, including when a form stays open overnight.
-create or replace function public.validate_challenge_edit()
+-- The entry end date locks once entries close, and the voting end date once voting closes.
+-- The entry fee is fixed at creation, like the radius and media type. Letting a creator
+-- raise it afterwards would change the deal for everyone who already paid to get in.
+-- (Keep comments out of the function body: the body must match the migration exactly,
+-- or the next declarative sync re-creates the function for no reason.)
+-- "Today" for challenge dates: the calendar day in Boston, where every challenge so far is.
+-- current_date is UTC, which would close entries at 7 pm Eastern on the last day.
+create or replace function public.challenge_today()
+returns date
+language sql
+stable
+set search_path to 'public'
+as $$
+    select (now() at time zone 'America/New_York')::date
+$$;
+
+grant execute on function public.challenge_today() to anon, authenticated, service_role;
+
+-- Which phase a challenge is in: 'upcoming', 'entry', 'voting' or 'closed' (null if no such challenge).
+-- Matches getChallengePhase in src/utils/challenge-dates.ts. Used by the submissions and votes policies.
+create or replace function public.challenge_phase(p_challenge_id text)
+returns text
+language sql
+stable
+set search_path to 'public'
+as $$
+    select case
+        when public.challenge_today() < c.start_at then 'upcoming'
+        when public.challenge_today() <= c.end_at then 'entry'
+        when public.challenge_today() <= c.voting_end_at then 'voting'
+        else 'closed'
+    end
+    from public.challenges c
+    where c.id = p_challenge_id
+$$;
+
+grant execute on function public.challenge_phase(text) to anon, authenticated, service_role;
+
+-- Fills in three days of voting when a challenge is created without a voting end date
+-- (e.g. by an app build that doesn't know about voting yet).
+create or replace function public.set_default_voting_end_at()
 returns trigger
 language plpgsql
 set search_path to 'public'
 as $$
 begin
-    -- The entry fee is fixed at creation, like the radius and media type. Letting a creator
-    -- raise it afterwards would change the deal for everyone who already paid to get in.
+    if new.voting_end_at is null then
+        new.voting_end_at := new.end_at + 3;
+    end if;
+    return new;
+end;
+$$;
+
+create or replace function public.validate_challenge_edit()
+returns trigger
+language plpgsql
+set search_path to 'public'
+as $$
+declare
+    today date := public.challenge_today();
+begin
     if new.id is distinct from old.id
        or new.created_at is distinct from old.created_at
        or new.radius_m is distinct from old.radius_m
@@ -53,14 +106,19 @@ begin
         raise exception 'Description must be 1 to 500 characters.';
     end if;
 
-    if new.end_at is distinct from old.end_at and new.end_at <= current_date then
-        raise exception 'The end date must be after today.';
+    if new.end_at is distinct from old.end_at then
+        if old.end_at < today then
+            raise exception 'The entry end date cannot change after entries have closed.';
+        end if;
+        if new.end_at <= today then
+            raise exception 'The end date must be after today.';
+        end if;
     end if;
     if new.start_at is distinct from old.start_at then
-        if old.start_at <= current_date then
+        if old.start_at <= today then
             raise exception 'The start date cannot change after the challenge has begun.';
         end if;
-        if new.start_at < current_date then
+        if new.start_at < today then
             raise exception 'The start date cannot be in the past.';
         end if;
     end if;
@@ -69,8 +127,21 @@ begin
         raise exception 'The end date cannot be before the start date.';
     end if;
 
+    if new.voting_end_at is distinct from old.voting_end_at then
+        if old.voting_end_at < today then
+            raise exception 'The voting end date cannot change after voting has closed.';
+        end if;
+        if new.voting_end_at < today then
+            raise exception 'The voting end date cannot be in the past.';
+        end if;
+    end if;
+    if (new.end_at is distinct from old.end_at or new.voting_end_at is distinct from old.voting_end_at)
+       and new.voting_end_at <= new.end_at then
+        raise exception 'Voting must end after the entry end date.';
+    end if;
+
     if new.latitude is distinct from old.latitude or new.longitude is distinct from old.longitude then
-        if old.start_at <= current_date then
+        if old.start_at <= today then
             raise exception 'The location cannot change after the challenge has begun.';
         end if;
         if not (new.latitude between -90 and 90 and new.longitude between -180 and 180) then
@@ -125,6 +196,66 @@ begin
     select media_type into challenge_media_type from public.challenges where id = new.challenge_id;
     if challenge_media_type is not null and new.media_type is distinct from challenge_media_type then
         raise exception 'This challenge only accepts % submissions.', challenge_media_type;
+    end if;
+    return new;
+end;
+$$;
+
+-- A vote can only switch submissions within the same challenge.
+-- Row level security can't compare old and new values, so a trigger does it.
+create or replace function public.validate_vote_update()
+returns trigger
+language plpgsql
+set search_path to 'public'
+as $$
+begin
+    if new.account_id <> old.account_id then
+        raise exception 'A vote''s account can''t be changed.';
+    end if;
+    if new.challenge_id <> old.challenge_id then
+        raise exception 'A vote can''t be moved to another challenge.';
+    end if;
+    return new;
+end;
+$$;
+
+-- Editing a comment may only change its text.
+-- Row level security can't compare old and new values, so a trigger does it.
+-- It also stamps edited_at itself, so the app can't fake or skip the "edited" mark.
+create or replace function public.validate_comment_update()
+returns trigger
+language plpgsql
+set search_path to 'public'
+as $$
+begin
+    if new.id <> old.id
+       or new.account_id <> old.account_id
+       or new.submission_id <> old.submission_id
+       or new.created_at <> old.created_at then
+        raise exception 'Only a comment''s text can be changed.';
+    end if;
+    if new.body is distinct from old.body then
+        new.edited_at := now();
+    else
+        new.edited_at := old.edited_at;
+    end if;
+    return new;
+end;
+$$;
+
+-- Nobody may vote for their own submission.
+-- Runs on insert and on update, so a vote can't be cast for, or moved onto, the voter's own entry.
+create or replace function public.prevent_self_vote()
+returns trigger
+language plpgsql
+set search_path to 'public'
+as $$
+begin
+    if exists (
+        select 1 from public.submissions s
+        where s.id = new.submission_id and s.account_id = new.account_id
+    ) then
+        raise exception 'You can''t vote for your own submission.';
     end if;
     return new;
 end;

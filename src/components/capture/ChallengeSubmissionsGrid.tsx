@@ -1,18 +1,27 @@
-import {useEffect, useState, type ReactElement} from 'react';
-import {ActivityIndicator, Pressable, StyleSheet, Text, View} from 'react-native';
+import {useEffect, useRef, useState, type ReactElement} from 'react';
+import {ActivityIndicator, Alert, Pressable, StyleSheet, Text, View} from 'react-native';
+import {router} from 'expo-router';
 import {fetchChallengeSubmissions, type SubmissionPhoto} from '@/lib/photos';
+import {fetchChallengeVotes, removeVote, submitVote, updateVote, type ChallengeVotes} from '@/lib/voting';
 import {theme} from '@/constants/theme';
 import PhotoGrid, {type GridPhoto} from './PhotoGrid';
-import ImageViewer from './ImageViewer';
-import VideoViewer from './VideoViewer';
 
-export default function ChallengeSubmissionsGrid({challengeId, header}: {challengeId: string; header: (submissionCount: number | null) => ReactElement}) {
+type Props = {
+    challengeId: string;
+    // Why votes can't be cast right now (e.g. "Voting opens on Dec 8, 2026, after entries close."), or null while voting is open
+    votingClosedMessage: string | null;
+    // voteCount is null while loading or if the votes couldn't be loaded
+    header: (submissionCount: number | null, voteCount: number | null) => ReactElement;
+};
+
+export default function ChallengeSubmissionsGrid({challengeId, votingClosedMessage, header}: Props) {
     const [photos, setPhotos] = useState<SubmissionPhoto[]>([]);
     const [submissionCount, setSubmissionCount] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
     const [revision, setRevision] = useState(0);
-    const [selected, setSelected] = useState<GridPhoto | null>(null);
+    const [votes, setVotes] = useState<ChallengeVotes | null>(null);   // null until loaded
+    const isVoting = useRef(false);                                     // blocks a second vote while one is saving
 
     useEffect(() => {
         let active = true;
@@ -24,6 +33,10 @@ export default function ChallengeSubmissionsGrid({challengeId, header}: {challen
             })
             .catch(() => {if (active) setError(true);})
             .finally(() => {if (active) setLoading(false);});
+        // Votes load on their own, so a votes failure doesn't hide the submissions
+        fetchChallengeVotes(challengeId)
+            .then((data) => {if (active) setVotes(data);})
+            .catch((err) => console.error('Could not load votes:', err));
         return () => {active = false;};
     }, [challengeId, revision]);
 
@@ -33,14 +46,62 @@ export default function ChallengeSubmissionsGrid({challengeId, header}: {challen
         setRevision((value) => value + 1);
     }
 
+    // KEY HANDLER: DOUBLE TAP TO VOTE
+    //   No vote yet: cast one. Voted for another photo: move the vote here. Voted for this one: take it back.
+    async function vote(photo: GridPhoto) {
+        if (!votes || isVoting.current) return;
+        // Outside the voting period the database refuses votes (see challenge_phase); say why instead of trying
+        if (votingClosedMessage) {
+            Alert.alert('Voting isn’t open', votingClosedMessage);
+            return;
+        }
+        // The database refuses this too (see prevent_self_vote); checking here just saves the round trip
+        if (photo.isOwn) {
+            Alert.alert('Could not vote', 'You can’t vote for your own submission.');
+            return;
+        }
+        isVoting.current = true;
+        const previous = votes.mySubmissionId;
+        try {
+            // Already voted for this photo: remove the vote
+            if (previous === photo.id) {
+                await removeVote(challengeId);
+                setVotes((current) => {
+                    if (!current) return current;
+                    const counts = {...current.counts, [photo.id]: Math.max((current.counts[photo.id] ?? 1) - 1, 0)};
+                    return {counts, total: Math.max(current.total - 1, 0), mySubmissionId: null};
+                });
+                return;
+            }
+
+            if (previous) await updateVote(challengeId, photo.id);
+            else await submitVote(challengeId, photo.id);
+
+            // Saved: update the counts here instead of reloading everything
+            setVotes((current) => {
+                if (!current) return current;
+                const counts = {...current.counts, [photo.id]: (current.counts[photo.id] ?? 0) + 1};
+                if (previous) counts[previous] = Math.max((counts[previous] ?? 1) - 1, 0);
+                return {counts, total: previous ? current.total : current.total + 1, mySubmissionId: photo.id};
+            });
+        } catch (err: any) {
+            Alert.alert('Could not vote', err?.message ?? 'Something went wrong. Please try again.');
+        } finally {
+            isVoting.current = false;
+        }
+    }
+
     return (
         <>
             <PhotoGrid
                 photos={photos}
-                onPhotoPress={setSelected}
+                // A tap opens the submission's own page: the photo or video, with its comments
+                onPhotoPress={(photo: GridPhoto) => router.push(`/submission/${photo.id}`)}
+                onPhotoDoublePress={vote}
+                voteCounts={votes?.counts}
                 refreshing={loading}
                 onRefresh={refresh}
-                header={<View style={styles.header}>{header(submissionCount)}<Text style={styles.title}>Submissions</Text></View>}
+                header={<View style={styles.header}>{header(submissionCount, votes?.total ?? null)}<Text style={styles.title}>Submissions</Text></View>}
                 footer={
                     <View style={styles.status}>
                         {loading ? <ActivityIndicator color={theme.colors.active} accessibilityLabel="Loading submissions" />
@@ -53,9 +114,6 @@ export default function ChallengeSubmissionsGrid({challengeId, header}: {challen
                     </View>
                 }
             />
-            {selected && (selected.mediaType === 'video'
-                ? <VideoViewer key={selected.id} videoUrl={selected.imageUrl} onClose={() => setSelected(null)} />
-                : <ImageViewer key={selected.id} imageUrl={selected.imageUrl} onClose={() => setSelected(null)} />)}
         </>
     );
 }

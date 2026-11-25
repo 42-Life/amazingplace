@@ -7,21 +7,23 @@ import { supabase } from '@/lib/supabase';
 import { fetchMyAccount } from '@/lib/accounts';
 import { deleteChallengePreview, uploadChallengePreview } from '@/lib/challenge-previews';
 import { getChallengeDate, isValidChallengeDate } from '@/utils/challenge-dates';
+import { normalizeChallengeTags } from '@/utils/challenge-tags';
+import {type ChallengeTagId} from '@/constants/types';
 import { MAX_PRICE_CENTS, MIN_PRICE_CENTS, formatPrice, isValidPriceCents } from '@/utils/price';
 
 
 // The columns every challenge query asks for, so none of them can forget one (e.g. media_type)
-export const CHALLENGE_FIELDS = 'id, title, description, latitude, longitude, start_at, end_at, radius_m, media_type, price_cents, preview_path';
+export const CHALLENGE_FIELDS = 'id, title, description, latitude, longitude, start_at, end_at, voting_end_at, radius_m, media_type, price_cents, tags, preview_path';
 
 
 // FETCH CHALLENGES
 // Gets the list of challenges from the database (used when picking which challenge to enter)
 export async function fetchChallenges(): Promise<ChallengeLocation[]> {
-    // STEP 1: Get challenges that have not ended, sorted by title.
+    // STEP 1: Get challenges that are still open for entries or votes, sorted by title.
     const {data, error} = await supabase
         .from('challenges')
         .select(CHALLENGE_FIELDS)
-        .gte('end_at', getChallengeDate())
+        .gte('voting_end_at', getChallengeDate())
         .order('title');
 
     // STEP 2: Stop here if the request failed
@@ -57,9 +59,11 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
             latitude, longitude,
             start_at: challenge.start_at,
             end_at: challenge.end_at,
+            voting_end_at: challenge.voting_end_at,
             radius_m: Number(challenge.radius_m),
             media_type: challenge.media_type,
             price_cents: Number(challenge.price_cents ?? 0),
+            tags: normalizeChallengeTags(challenge.tags),
             preview_path: challenge.preview_path ?? null,
         }]
     })
@@ -67,14 +71,17 @@ export async function fetchChallenges(): Promise<ChallengeLocation[]> {
 }
 
 
-// Challenges this user has submitted a photo to, excluding ended challenges.
+// Challenges this user has submitted a photo to, excluding ones whose voting has closed.
 // Querying challenges keeps each challenge in the list once, even with multiple submissions.
 export type ParticipatingChallenge = {
     id: string;
     title: string;
     description: string;
+    tags: ChallengeTagId[];
     joinedAt: string;
-    endAt: string;
+    startAt: string;
+    endAt: string;          // last day of entries
+    votingEndAt: string;    // last day of voting
 };
 
 export async function fetchParticipatingChallenges(): Promise<ParticipatingChallenge[]> {
@@ -83,9 +90,9 @@ export async function fetchParticipatingChallenges(): Promise<ParticipatingChall
 
     const {data, error} = await supabase
         .from('challenges')
-        .select('id, title, description, end_at, submissions!inner(account_id, created_at)')
+        .select('id, title, description, tags, start_at, end_at, voting_end_at, submissions!inner(account_id, created_at)')
         .eq('submissions.account_id', account.id)
-        .gte('end_at', getChallengeDate())
+        .gte('voting_end_at', getChallengeDate())
         .order('title')
         .order('created_at', {referencedTable: 'submissions', ascending: true})
         .limit(1, {referencedTable: 'submissions'});
@@ -95,8 +102,11 @@ export async function fetchParticipatingChallenges(): Promise<ParticipatingChall
         id: challenge.id,
         title: challenge.title,
         description: challenge.description ?? '',
+        tags: normalizeChallengeTags(challenge.tags),
         joinedAt: challenge.submissions[0].created_at,
+        startAt: challenge.start_at,
         endAt: challenge.end_at,
+        votingEndAt: challenge.voting_end_at,
     }));
 }
 
@@ -111,7 +121,7 @@ export async function fetchChallengeById(id: string): Promise<ChallengeLocation 
         .from('challenges')
         .select(CHALLENGE_FIELDS)
         .eq('id', id)
-        .gte('end_at', getChallengeDate())
+        .gte('voting_end_at', getChallengeDate())
         .maybeSingle();
 
     // STEP 2: Stop here if the request failed
@@ -156,11 +166,18 @@ export async function fetchCreatedChallengeById(id: string): Promise<ChallengeLo
 }
 
 export type ChallengeEdits = Partial<Pick<ChallengeLocation,
-    'title' | 'description' | 'start_at' | 'end_at' | 'latitude' | 'longitude'>>;
+    'title' | 'description' | 'start_at' | 'end_at' | 'voting_end_at' | 'latitude' | 'longitude' | 'tags'>>;
 
 // Validate against the latest saved challenge, rather than a potentially stale form.
 export function validateChallengeEdits(current: ChallengeLocation, edits: ChallengeEdits, today = getChallengeDate()): ChallengeEdits {
     const changes: ChallengeEdits = {};
+    if (edits.tags !== undefined) {
+        const tags = normalizeChallengeTags(edits.tags);
+        if (tags.length < 1 || tags.length > 3 || tags.length !== edits.tags.length) {
+            throw new Error('Choose between 1 and 3 valid categories.');
+        }
+        if (JSON.stringify(tags) !== JSON.stringify(current.tags ?? [])) changes.tags = tags;
+    }
     if (edits.title !== undefined && edits.title.trim() !== current.title) {
         const title = edits.title.trim();
         if (!title || title.length > 80) throw new Error('Title must be 1 to 80 characters.');
@@ -172,8 +189,18 @@ export function validateChallengeEdits(current: ChallengeLocation, edits: Challe
         changes.description = description;
     }
     if (edits.end_at !== undefined && edits.end_at !== current.end_at) {
+        if (current.end_at < today) throw new Error('The entry end date cannot change after entries have closed.');
         if (!isValidChallengeDate(edits.end_at) || edits.end_at <= today) throw new Error('The end date must be after today.');
         changes.end_at = edits.end_at;
+    }
+    if (edits.voting_end_at !== undefined && edits.voting_end_at !== current.voting_end_at) {
+        if (current.voting_end_at < today) throw new Error('The voting end date cannot change after voting has closed.');
+        if (!isValidChallengeDate(edits.voting_end_at) || edits.voting_end_at < today) throw new Error('The voting end date cannot be in the past.');
+        changes.voting_end_at = edits.voting_end_at;
+    }
+    if ((changes.end_at !== undefined || changes.voting_end_at !== undefined)
+        && (changes.voting_end_at ?? current.voting_end_at) <= (changes.end_at ?? current.end_at)) {
+        throw new Error('Voting must end after the entry end date.');
     }
     const hasBegun = current.start_at <= today;
     if (edits.start_at !== undefined && edits.start_at !== current.start_at) {
@@ -280,16 +307,19 @@ export async function createChallenge(challenge: NewChallenge, previewUri?: stri
     const {radius_m} = challenge;
     if (radius_m == null || !Number.isFinite(radius_m) || radius_m <= 0) throw new Error('Radius must be more than 0 meters.');
 
-    // STEP 2c: Both dates are required (database: not null), must be real dates, not in the past,
-    //   and the end can't come before the start.
+    // STEP 2c: All three dates are required (database: not null), must be real dates, not in the past,
+    //   the end can't come before the start, and voting ends after entries do.
     //   isValidChallengeDate also rejects a missing or empty date.
     //   YYYY-MM-DD strings sort like dates, so plain < comparisons work
-    const {start_at, end_at} = challenge;
+    const {start_at, end_at, voting_end_at} = challenge;
     const today = getChallengeDate();
     if (!start_at || !isValidChallengeDate(start_at)) throw new Error('Pick a valid start date.');
     if (!end_at || !isValidChallengeDate(end_at)) throw new Error('Pick a valid end date.');
+    if (!voting_end_at || !isValidChallengeDate(voting_end_at)) throw new Error('Pick a valid voting end date.');
     if (start_at < today) throw new Error('The start date can\'t be in the past.');
     if (end_at < start_at) throw new Error('The end date can\'t be before the start date.');
+    //   Voting starts the day after entries close, so it has to end after the entry end date
+    if (voting_end_at <= end_at) throw new Error('Voting must end after the entry end date.');
 
     // STEP 2d: Entries are either photos or videos (database: 'photo' or 'video')
     const {media_type} = challenge;
@@ -300,6 +330,12 @@ export async function createChallenge(challenge: NewChallenge, previewUri?: stri
     const {price_cents} = challenge;
     if (!isValidPriceCents(price_cents)) {
         throw new Error(`An entry fee must be free, or between ${formatPrice(MIN_PRICE_CENTS)} and ${formatPrice(MAX_PRICE_CENTS)}.`);
+    }
+
+    // STEP 2f: Every challenge must have 1-3 recognised category tags.
+    const tags = normalizeChallengeTags(challenge.tags);
+    if (tags.length < 1 || tags.length > 3 || tags.length !== (challenge.tags ?? []).length) {
+        throw new Error('Choose between 1 and 3 valid categories.');
     }
 
     // STEP 3: Make sure the user is signed in
@@ -316,7 +352,7 @@ export async function createChallenge(challenge: NewChallenge, previewUri?: stri
     // STEP 6: Insert the challenge and ask the database to send the saved row back
     const {data, error} = await supabase
         .from('challenges')
-        .insert({id, title, description, latitude, longitude, radius_m, start_at, end_at, media_type, price_cents, preview_path, creator_account_id: account.id})
+        .insert({id, title, description, latitude, longitude, radius_m, start_at, end_at, voting_end_at, media_type, price_cents, tags, preview_path, creator_account_id: account.id})
         .select(CHALLENGE_FIELDS)
         .single();
 

@@ -7,7 +7,7 @@ import {fetchCreatedChallenges} from '@/lib/challenges';
 import type {ChallengeLocation} from '@/constants/types';
 import {theme} from '@/constants/theme';
 import {challengeListStyles as listStyles} from '@/constants/styles';
-import {getChallengeDate} from '@/utils/challenge-dates';
+import {describeChallengePhase, getChallengeDate, getChallengePhaseDisplay} from '@/utils/challenge-dates';
 
 export default function ChallengeDashboard() {
     const [revision, setRevision] = useState(0);
@@ -61,14 +61,17 @@ function DashboardList({onRetry}: {onRetry: () => void}) {
             renderItem={({item}) => (
                 <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Edit challenge: ${item.title}`}
-                    onPress={() => router.push({pathname: '/manage-challenge/[id]', params: {id: item.id}})}
+                    accessibilityLabel={`View stats: ${item.title}`}
+                    // Opens the stats page; editing is a button on that page
+                    onPress={() => router.push({pathname: '/challenge-stats/[id]', params: {id: item.id}})}
                     style={({pressed}) => [listStyles.row, pressed && listStyles.pressed]}
                 >
                     <View style={listStyles.cardBody}>
                         <Text style={listStyles.title}>{item.title}</Text>
                         <Text style={listStyles.description} numberOfLines={2} ellipsizeMode="tail">{item.description}</Text>
-                        <Text style={styles.hint}>{item.end_at < today ? 'Ended' : item.start_at > today ? 'Upcoming' : 'Active'} · Ends {new Date(`${item.end_at}T12:00:00`).toLocaleDateString()}</Text>
+                        {/* Challenge status with dynamic color rendering */}
+                        <Text style={[styles.phaseLabel, {color: getChallengePhaseDisplay(item, today).color}]}>{getChallengePhaseDisplay(item, today).label}</Text>
+                        <Text style={styles.hint}>{describeChallengePhase(item, today)}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={22} color={theme.colors.inactive} />
                 </Pressable>
@@ -83,6 +86,7 @@ const styles = StyleSheet.create({
     title: {fontSize: 24, fontWeight: '700', color: theme.colors.text},
     sectionTitle: {fontSize: 20, fontWeight: '700', color: theme.colors.text, marginTop: 12},
     hint: {fontSize: 14, lineHeight: 20, color: theme.colors.inactive},
+    phaseLabel: {fontSize: 14, lineHeight: 16, fontWeight: '600'},
     createButton: {minHeight: 48, borderRadius: 12, padding: 12, backgroundColor: theme.colors.active, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8},
     buttonText: {fontSize: 16, fontWeight: '700', color: '#FFFFFF'},
     status: {alignItems: 'center', gap: 8},
