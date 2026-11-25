@@ -195,9 +195,13 @@ export default function ChallengeScreen() {
                             )}
                         </Pressable>
                         {/* Reassure repeat visitors that they aren't about to be charged twice */}
-                        {isPaid && entry.hasAccess && !entry.isChecking && (
-                            <Text style={styles.paymentNote}>Entry fee paid.</Text>
-                        )}
+                            {isPaid && entry.hasAccess && !entry.isChecking && (
+                                <Text style={styles.paymentNote}>
+                                    {entry.accessReason === 'creator'
+                                        ? 'You created this challenge, so entry is free for you.'
+                                        : 'Entry fee paid.'}
+                                </Text>
+                            )}
                         </>}
                     </View>
                 </>

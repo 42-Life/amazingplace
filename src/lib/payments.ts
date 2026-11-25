@@ -48,17 +48,26 @@ export async function fetchMyEntry(challengeId: string): Promise<ChallengeEntry 
 }
 
 
-// CAN I ENTER THIS CHALLENGE?
-// True for free challenges, for the creator's own challenge, and once the fee is paid.
+// WHY CAN I ENTER?
+//   free:    the challenge has no entry fee
+//   creator: it's the signed-in user's own challenge, so they never pay
+//   paid:    they paid the fee (the webhook marked their entry row as paid)
+export type EntryAccess = 'free' | 'creator' | 'paid';
+
+
+// GET MY ENTRY ACCESS
+// Says why the signed-in user may enter this challenge, or null if they may not (yet).
 // This mirrors the database's has_challenge_access function. If the two ever disagree,
 // the database wins: it is what actually refuses the submission.
-export async function canEnterChallenge(challenge: ChallengeLocation): Promise<boolean> {
-    if (!isPaidChallenge(challenge)) return true;
+export async function getEntryAccess(challenge: ChallengeLocation): Promise<EntryAccess | null> {
+    // STEP 1: Free challenges let everyone in
+    if (!isPaidChallenge(challenge)) return 'free';
 
+    // STEP 2: Everything below needs a signed-in account
     const account = await fetchMyAccount();
-    if (!account) return false;
+    if (!account) return null;
 
-    // Creators don't pay to enter their own challenge.
+    // STEP 3: Creators don't pay to enter their own challenge.
     const {data: owned, error: ownedError} = await supabase
         .from('challenges')
         .select('id')
@@ -66,10 +75,18 @@ export async function canEnterChallenge(challenge: ChallengeLocation): Promise<b
         .eq('creator_account_id', account.id)
         .maybeSingle();
     if (ownedError) throw ownedError;
-    if (owned) return true;
+    if (owned) return 'creator';
 
+    // STEP 4: Everyone else needs a paid entry row
     const entry = await fetchMyEntry(challenge.id);
-    return entry?.status === 'paid';
+    return entry?.status === 'paid' ? 'paid' : null;
+}
+
+
+// CAN I ENTER THIS CHALLENGE?
+// Same check as getEntryAccess, when you only need a yes or no.
+export async function canEnterChallenge(challenge: ChallengeLocation): Promise<boolean> {
+    return (await getEntryAccess(challenge)) !== null;
 }
 
 

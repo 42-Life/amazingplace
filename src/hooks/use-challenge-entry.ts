@@ -8,7 +8,7 @@
 import {useCallback, useEffect, useState} from 'react';
 import {useStripe} from '@stripe/stripe-react-native';
 import type {ChallengeLocation} from '@/constants/types';
-import {canEnterChallenge, isPaidChallenge, startEntryPayment} from '@/lib/payments';
+import {getEntryAccess, isPaidChallenge, startEntryPayment, type EntryAccess} from '@/lib/payments';
 import {MERCHANT_DISPLAY_NAME, STRIPE_SETUP_MESSAGE, isStripeConfigured} from '@/lib/stripe';
 
 // How long to keep asking the database whether the webhook has landed.
@@ -20,21 +20,24 @@ const ACCESS_POLL_DELAY_MS = 750;
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export type ChallengeEntryState = {
-    hasAccess: boolean          // may they submit right now?
-    isChecking: boolean         // still loading the answer
-    isPaying: boolean           // the payment sheet is open or settling
+    hasAccess: boolean                  // may they submit right now?
+    accessReason: EntryAccess | null    // why: 'free', 'creator' (their own challenge) or 'paid'. null = no access yet
+    isChecking: boolean                 // still loading the answer
+    isPaying: boolean                   // the payment sheet is open or settling
     errorMessage: string | null
-    pay: () => Promise<boolean> // runs the payment; resolves true once they're in
+    pay: () => Promise<boolean>         // runs the payment; resolves true once they're in
 };
 
 export function useChallengeEntry(challenge: ChallengeLocation | null): ChallengeEntryState {
     const {initPaymentSheet, presentPaymentSheet} = useStripe();
 
-    const [paidAccess, setPaidAccess] = useState(false);
+    // Why this person may enter a paid challenge ('creator' or 'paid'), or null if they may not.
+    //   (Free challenges don't use this: they never need a lookup.)
+    const [grantedAccess, setGrantedAccess] = useState<EntryAccess | null>(null);
     const [isPaying, setIsPaying] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    // Which challenge paidAccess is the answer for. Comparing it to the challenge on screen
+    // Which challenge grantedAccess is the answer for. Comparing it to the challenge on screen
     // is what "still checking" means, so opening a different challenge shows the spinner
     // again without anyone having to set a flag back to true.
     const [checkedChallengeId, setCheckedChallengeId] = useState<string | null>(null);
@@ -43,9 +46,10 @@ export function useChallengeEntry(challenge: ChallengeLocation | null): Challeng
     // the button behaves exactly as it did before fees existed.
     const isFree = challenge ? !isPaidChallenge(challenge) : false;
     const isChecking = !challenge || (!isFree && checkedChallengeId !== challenge.id);
-    const hasAccess = isFree || paidAccess;
+    const hasAccess = isFree || grantedAccess !== null;
+    const accessReason: EntryAccess | null = isFree ? 'free' : grantedAccess;
 
-    // ON LOAD: find out whether they already have access
+    // ON LOAD: find out whether they already have access (and why)
     useEffect(() => {
         // No challenge yet means the screen is still loading one
         if (!challenge || !isPaidChallenge(challenge)) return;
@@ -54,14 +58,14 @@ export function useChallengeEntry(challenge: ChallengeLocation | null): Challeng
 
         (async () => {
             try {
-                const allowed = await canEnterChallenge(challenge);
-                if (isMounted) setPaidAccess(allowed);
+                const access = await getEntryAccess(challenge);
+                if (isMounted) setGrantedAccess(access);
             } catch (err) {
                 // If we can't tell, assume they haven't paid. Showing the pay button to
                 // someone who already paid is recoverable (the edge function says so and
                 // lets them in); letting a non-payer through is not.
                 console.error('Could not check challenge access:', err);
-                if (isMounted) setPaidAccess(false);
+                if (isMounted) setGrantedAccess(null);
             } finally {
                 if (isMounted) setCheckedChallengeId(challenge.id);
             }
@@ -86,7 +90,7 @@ export function useChallengeEntry(challenge: ChallengeLocation | null): Challeng
             //   null means it had already been paid for, so there is nothing to show.
             const params = await startEntryPayment(challenge.id);
             if (!params) {
-                setPaidAccess(true);
+                setGrantedAccess('paid');
                 return true;
             }
 
@@ -113,12 +117,12 @@ export function useChallengeEntry(challenge: ChallengeLocation | null): Challeng
 
             // STEP 4: The card went through. Wait for the webhook to write the entry row,
             //   because that row, not the sheet, is what the database checks on submit.
-            const allowed = await waitForAccess(challenge);
-            setPaidAccess(allowed);
-            if (!allowed) {
+            const access = await waitForAccess(challenge);
+            setGrantedAccess(access);
+            if (!access) {
                 setErrorMessage('Your payment went through. It is taking a moment to confirm — please reopen this challenge shortly.');
             }
-            return allowed;
+            return access !== null;
         } catch (err: any) {
             console.error('Could not pay for challenge entry:', err);
             setErrorMessage(err?.message ?? 'Could not take the payment. Please try again.');
@@ -128,20 +132,21 @@ export function useChallengeEntry(challenge: ChallengeLocation | null): Challeng
         }
     }, [challenge, initPaymentSheet, isPaying, presentPaymentSheet]);
 
-    return {hasAccess, isChecking, isPaying, errorMessage, pay};
+    return {hasAccess, accessReason, isChecking, isPaying, errorMessage, pay};
 }
 
 
 // Keep checking for the webhook's entry row for a few seconds before giving up.
 // Giving up isn't losing the money: the row still appears, just after this screen stopped looking.
-async function waitForAccess(challenge: ChallengeLocation): Promise<boolean> {
+async function waitForAccess(challenge: ChallengeLocation): Promise<EntryAccess | null> {
     for (let attempt = 0; attempt < ACCESS_POLL_ATTEMPTS; attempt++) {
         try {
-            if (await canEnterChallenge(challenge)) return true;
+            const access = await getEntryAccess(challenge);
+            if (access) return access;
         } catch (err) {
             console.error('Could not confirm challenge access:', err);
         }
         await wait(ACCESS_POLL_DELAY_MS);
     }
-    return false;
+    return null;
 }
